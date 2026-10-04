@@ -1,0 +1,59 @@
+[project]
+name = "auto-ds-agent"
+version = "0.1.0"
+description = "LangGraph agent that profiles a tabular dataset, infers the ML task, self-repairs feature engineering code in a sandbox, and benchmarks candidate models."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-openai>=1.6.7",
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+    "structlog>=24.1",
+]
+
+# Dependencies are added per phase, not up front:
+#   Phase 2  uv add langchain-openai  (done; add langchain-anthropic only to switch provider)
+#   Phase 4  uv add langgraph
+#   Phase 5  uv add scikit-learn xgboost lightgbm
+#   Phase 6  uv add typer
+#   Phase 7  uv add streamlit
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.5",
+]
+
+# [project.scripts] is deliberately absent until Phase 6 creates src/autods/cli.py.
+# Declaring `autods = "autods.cli:app"` now installs fine but fails at invocation
+# with an ImportError, which reads as a broken environment rather than a missing file.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autods"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "D"]
+ignore = [
+    "D107",    # __init__ docstring lives on the class
+    "ANN401",  # Any is occasionally the honest annotation
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
