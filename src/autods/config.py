@@ -76,6 +76,9 @@ MAX_FE_ATTEMPTS = 3  # After this many failures the graph routes to fallback FE.
 SANDBOX_TIMEOUT_S = 120
 SANDBOX_SAMPLE_ROWS = 1_000  # Run generated code on a sample first, to fail fast.
 LEAKAGE_CORRELATION_THRESHOLD = 0.99  # A new column this correlated with the target is suspect.
+# Ceiling on feature columns the generated code may return; catches one-hot
+# encoding of a high-cardinality column exploding the frame.
+MAX_FE_COLUMNS = 500
 
 # --- Profiler --------------------------------------------------------------
 

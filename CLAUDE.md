@@ -93,7 +93,8 @@ Datasets on disk: `datasets/Titanic-Dataset.csv`, `datasets/ames_train.csv`.
 
 **Phase:** 3 — FE codegen + sandbox. Phase 1 ✅ · Phase 2 ✅
 **Phase 2 result:** router eval 10/10 (raw and post-sanity-check), 10/10 stable over 3 runs, $0.0049/call on `openai:gpt-6.1-sol` (`runs/eval_router_20261005_003942.json`); `openai:gpt-6-luna` also 10/10 stable at $0.0003/call (`runs/eval_router_20261005_004809.json`) → router now on Luna, codegen/reporter on Sol. Caveat for README: descriptions are explicit and the sanity check never fired in the eval; its value is shown by unit tests. Candidate Phase 8 addition: a harder eval set (vague/missing descriptions, ambiguous targets).
-**Next task:** 3.1 — sandbox contract (`sandbox/contract.py`: the `engineer_features` signature + post-execution validation) before the executor and codegen
+**Phase 3 done:** 3.1 contract (`sandbox/contract.py`: `prepare_target` converts text-number targets before FE; `validate_output` enforces exact row count, target unchanged, numeric/NaN/inf-free features, ≤ `MAX_FE_COLUMNS`, leakage — new leaky column = error, original = warning). Branch: `phase-3-sandbox`.
+**Next task:** 3.2 — executor (`sandbox/executor.py`: subprocess, timeout, sample-first, structured `ExecutionResult`)
 
 <!-- Update these lines at the end of every session. Ask me to. -->
 

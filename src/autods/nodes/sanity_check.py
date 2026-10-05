@@ -21,11 +21,10 @@ from autods.config import (
     SANITY_FLAGGED_CONFIDENCE,
     SANITY_MAX_CLASSES,
 )
+from autods.sandbox.contract import strip_number_decorations
 from autods.state import AgentState, ColumnProfile, TaskDecision
 
 log = structlog.get_logger(__name__)
-
-_NUMBER_DECORATIONS = str.maketrans("", "", "$€£,% ")
 
 
 def _is_numeric(target: ColumnProfile) -> bool:
@@ -54,12 +53,16 @@ def _is_whole_numbered(target: ColumnProfile) -> bool:
 
 
 def _parses_as_numbers(samples: list[str]) -> bool:
-    """True if every sample is a number once currency, comma, % and spaces go."""
+    """True if every sample is a number once currency, comma, % and spaces go.
+
+    Shares strip_number_decorations with prepare_target, so the check never
+    approves a text target that the conversion step would then refuse.
+    """
     if not samples:
         return False
     try:
         for sample in samples:
-            float(sample.translate(_NUMBER_DECORATIONS))
+            float(strip_number_decorations(sample))
     except ValueError:
         return False
     return True
