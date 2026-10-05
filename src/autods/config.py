@@ -73,8 +73,38 @@ MAX_FE_ATTEMPTS = 3  # After this many failures the graph routes to fallback FE.
 
 # --- Sandbox ---------------------------------------------------------------
 
-SANDBOX_TIMEOUT_S = 120
+SANDBOX_TIMEOUT_S = 120  # Per run (sample and full each get this long).
 SANDBOX_SAMPLE_ROWS = 1_000  # Run generated code on a sample first, to fail fast.
+# Address-space cap for the child process. POSIX only: Windows has no
+# `resource` module, so there the timeout is the only resource limit.
+SANDBOX_MAX_MEMORY_MB = 4_096
+SANDBOX_OUTPUT_TAIL_CHARS = 3_000  # stdout/stderr kept per run, from the end.
+# Guardrails against accidental harm, checked statically before execution.
+# Not security: a determined adversary can get around an AST check.
+SANDBOX_ALLOWED_IMPORTS: tuple[str, ...] = (
+    "pandas",
+    "numpy",
+    "math",
+    "re",
+    "datetime",
+    "string",
+    "itertools",
+    "collections",
+    "functools",
+    "statistics",
+    "typing",
+)
+SANDBOX_BLOCKED_CALLS: tuple[str, ...] = (
+    "open",
+    "exec",
+    "eval",
+    "compile",
+    "__import__",
+    "input",
+    "breakpoint",
+    "globals",
+    "locals",
+)
 LEAKAGE_CORRELATION_THRESHOLD = 0.99  # A new column this correlated with the target is suspect.
 # Ceiling on feature columns the generated code may return; catches one-hot
 # encoding of a high-cardinality column exploding the frame.
