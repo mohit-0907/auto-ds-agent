@@ -1,8 +1,4 @@
-"""Tests for the router node. The LLM is faked; no network calls.
-
-The fake stands in for get_llm(...).with_structured_output(..., include_raw=True)
-and returns the same {"raw", "parsed", "parsing_error"} dict LangChain does.
-"""
+"""Tests for the router node. The LLM is faked (tests/helpers.py); no network calls."""
 
 import operator
 from typing import Any, get_type_hints
@@ -16,36 +12,12 @@ from autods.llm import load_prompt
 from autods.nodes.profiler import fit_to_budget, profile_dataset
 from autods.nodes.router import build_router_messages, router_node
 from autods.state import AgentState, DataProfile, TaskDecision
-from tests.helpers import make_state
+from tests.helpers import USAGE, FakeStructuredLLM, install_fake_llm, make_state, ok_result
 
-USAGE = {"input_tokens": 1500, "output_tokens": 80, "total_tokens": 1580}
 # Derived from the configured router model's rates, so swapping ROUTER_MODEL does
 # not break these tests; the rates themselves are tested in test_llm.py.
 _IN_RATE, _OUT_RATE = MODEL_PRICING_PER_MTOK[ROUTER_MODEL]
 CALL_COST = (USAGE["input_tokens"] * _IN_RATE + USAGE["output_tokens"] * _OUT_RATE) / 1_000_000
-
-
-class FakeStructuredLLM:
-    def __init__(self, result: dict | None = None, exc: Exception | None = None) -> None:
-        self.result = result
-        self.exc = exc
-        self.messages: list | None = None
-
-    def invoke(self, messages: list) -> dict:
-        self.messages = messages
-        if self.exc is not None:
-            raise self.exc
-        return self.result
-
-
-class FakeLLM:
-    def __init__(self, structured: FakeStructuredLLM) -> None:
-        self.structured = structured
-
-    def with_structured_output(self, schema: type, include_raw: bool = False) -> FakeStructuredLLM:
-        assert schema is TaskDecision
-        assert include_raw, "include_raw=True is needed to read token usage"
-        return self.structured
 
 
 @pytest.fixture(scope="module")
@@ -64,12 +36,7 @@ def _decision(**overrides: Any) -> TaskDecision:
     return TaskDecision(**(fields | overrides))
 
 
-def _ok(decision: TaskDecision) -> dict:
-    return {
-        "raw": AIMessage(content="", usage_metadata=USAGE),
-        "parsed": decision,
-        "parsing_error": None,
-    }
+_ok = ok_result
 
 
 def _run(
@@ -78,9 +45,11 @@ def _run(
     result: dict | None = None,
     exc: Exception | None = None,
 ) -> tuple[dict, FakeStructuredLLM]:
-    fake = FakeStructuredLLM(result, exc)
-    monkeypatch.setattr("autods.nodes.router.get_llm", lambda model: FakeLLM(fake))
-    return router_node(state), fake
+    fake = install_fake_llm(monkeypatch, result, exc)
+    update = router_node(state)
+    if fake.schema is not None:
+        assert fake.schema is TaskDecision
+    return update, fake
 
 
 # --- Happy path -------------------------------------------------------------------
@@ -133,7 +102,7 @@ def test_no_profile_skips_the_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     def explode(model: str) -> None:
         raise AssertionError("the LLM must not be called without a profile")
 
-    monkeypatch.setattr("autods.nodes.router.get_llm", explode)
+    monkeypatch.setattr("autods.llm.get_llm", explode)
     update = router_node(make_state())
 
     assert update["task_decision"] is None

@@ -118,6 +118,29 @@ class TaskDecision(BaseModel):
     )
 
 
+class FECode(BaseModel):
+    """The codegen LLM's feature engineering attempt.
+
+    LLM-authored via .with_structured_output(FECode), so these descriptions
+    reach the model as JSON schema. Field order is deliberate: structured output
+    is generated in schema order, so the model commits to its reasoning (and,
+    on a retry, its diagnosis of the failure) before writing any code.
+    """
+
+    explanation: str = Field(
+        description=(
+            "Before any code: what the features are and why. On a retry, first name "
+            "the error that occurred and its cause, then the fix. Three to six sentences."
+        )
+    )
+    code: str = Field(
+        description=(
+            "Complete Python source defining engineer_features(df, target_column). Plain "
+            "code only, no markdown fences, no example usage or tests."
+        )
+    )
+
+
 class ModelResult(BaseModel):
     """One candidate model's cross-validated performance in the arena.
 
@@ -150,7 +173,7 @@ class AgentState(TypedDict):
     Paths cross node boundaries, never DataFrames -- frames are not serializable
     and would make each checkpoint cost hundreds of megabytes.
 
-    The four ``Annotated[..., operator.add]`` keys are written by more than one
+    The five ``Annotated[..., operator.add]`` keys are written by more than one
     node (or more than once by the same node) and accumulate. Everything else is
     last-write-wins, which is what keeps a replayed or resumed run idempotent.
 
@@ -167,7 +190,10 @@ class AgentState(TypedDict):
     data_profile: DataProfile | None
     task_decision: TaskDecision | None
     fe_code: str | None
+    # One entry per FE attempt, index-aligned: fe_code_history[i] produced
+    # tracebacks[i] (its ExecutionResult.feedback()) and fe_explanations[i].
     fe_code_history: Annotated[list[str], operator.add]
+    fe_explanations: Annotated[list[str], operator.add]
     tracebacks: Annotated[list[str], operator.add]
     processed_data_path: str | None
     n_retries: int

@@ -73,6 +73,24 @@ class ExecutionResult(BaseModel):
         """True when the code ran on the full frame and passed validation."""
         return self.status == "ok"
 
+    def feedback(self) -> str:
+        """Render this failure for the codegen retry prompt and state["tracebacks"].
+
+        The first line is always a one-line summary (status, stage, message
+        collapsed to one line): the codegen node uses it alone to summarize
+        earlier attempts. Detail -- every validation error, the traceback --
+        follows below it.
+        """
+        summary = " ".join(f"[{self.status} at {self.stage} stage] {self.message}".split())
+        parts = [summary]
+        if self.validation and self.validation.errors:
+            parts.append(
+                "Contract violations:\n" + "\n".join(f"- {e}" for e in self.validation.errors)
+            )
+        if self.traceback:
+            parts.append("Traceback:\n" + self.traceback.strip())
+        return "\n\n".join(parts)
+
 
 def static_check(code: str) -> list[str]:
     """Reject code that cannot or should not run, without starting a process.

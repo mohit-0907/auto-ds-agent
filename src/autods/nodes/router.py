@@ -12,8 +12,8 @@ from typing import Any
 
 import structlog
 
-from autods.config import ROUTER_MODEL, estimate_cost_usd
-from autods.llm import get_llm, load_prompt
+from autods.config import ROUTER_MODEL
+from autods.llm import invoke_structured, load_prompt
 from autods.state import AgentState, DataProfile, TaskDecision
 
 log = structlog.get_logger(__name__)
@@ -107,43 +107,21 @@ def router_node(state: AgentState) -> dict[str, Any]:
 
     target_column = state["target_column"]
     messages = build_router_messages(profile, state["user_description"], target_column)
-    # Outside the try: a malformed ROUTER_MODEL is a configuration bug, and
-    # should fail loudly rather than read as "the LLM had a bad day".
-    llm = get_llm(ROUTER_MODEL).with_structured_output(TaskDecision, include_raw=True)
-
-    try:
-        result = llm.invoke(messages)
-    # Broad on purpose, and scoped to the one line that talks to the network:
-    # each provider SDK raises its own exception hierarchy, and none of them
-    # should crash the run. Our own code is outside this try.
-    except Exception as exc:
-        log.warning("router.llm_failed", error=f"{type(exc).__name__}: {exc}")
+    call = invoke_structured(ROUTER_MODEL, TaskDecision, messages)
+    if call.parsed is None:
         return {
             "task_decision": None,
-            "warnings": [f"Routing failed: LLM call raised {type(exc).__name__}: {exc}"],
-        }
-
-    usage = getattr(result["raw"], "usage_metadata", None) or {}
-    input_tokens = usage.get("input_tokens", 0)
-    output_tokens = usage.get("output_tokens", 0)
-    cost = estimate_cost_usd(ROUTER_MODEL, input_tokens, output_tokens)
-
-    decision = result["parsed"]
-    if result["parsing_error"] is not None or decision is None:
-        log.warning("router.parse_failed", error=str(result["parsing_error"]))
-        return {
-            "task_decision": None,
-            "token_cost_usd": cost,
-            "warnings": [f"Routing failed: could not parse LLM output: {result['parsing_error']}"],
+            "token_cost_usd": call.cost_usd,
+            "warnings": [f"Routing failed: {call.error}"],
         }
 
     try:
-        decision = validate_decision(decision, profile, target_column)
+        decision = validate_decision(call.parsed, profile, target_column)
     except ValueError as exc:
-        log.warning("router.invalid_decision", error=str(exc), decision=decision.model_dump())
+        log.warning("router.invalid_decision", error=str(exc), decision=call.parsed.model_dump())
         return {
             "task_decision": None,
-            "token_cost_usd": cost,
+            "token_cost_usd": call.cost_usd,
             "warnings": [f"Routing failed: {exc}"],
         }
 
@@ -152,8 +130,8 @@ def router_node(state: AgentState) -> dict[str, Any]:
         task_type=decision.task_type,
         target_column=decision.target_column,
         confidence=decision.confidence,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost_usd=round(cost, 6),
+        input_tokens=call.input_tokens,
+        output_tokens=call.output_tokens,
+        cost_usd=round(call.cost_usd, 6),
     )
-    return {"task_decision": decision, "token_cost_usd": cost}
+    return {"task_decision": decision, "token_cost_usd": call.cost_usd}
