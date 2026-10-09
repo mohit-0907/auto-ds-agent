@@ -185,6 +185,10 @@ class AgentState(TypedDict):
     dataset_path: str
     user_description: str
     target_column: str | None
+    # This run's artifact folder, e.g. runs/20261010_143000_titanic/. Set once
+    # when the run starts; every node that writes files writes inside it, so
+    # later nodes find earlier outputs through state, not by guessing paths.
+    run_dir: str
 
     # Stage outputs
     data_profile: DataProfile | None

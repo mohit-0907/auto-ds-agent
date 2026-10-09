@@ -65,6 +65,7 @@ def make_state(**overrides: Any) -> AgentState:
         dataset_path="",
         user_description="",
         target_column=None,
+        run_dir="",
         data_profile=None,
         task_decision=None,
         fe_code=None,
