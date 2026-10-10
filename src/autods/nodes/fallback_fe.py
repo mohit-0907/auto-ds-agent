@@ -25,7 +25,7 @@ import structlog
 
 from autods.config import MAX_CATEGORICAL_UNIQUE
 from autods.nodes.profiler import load_dataset
-from autods.sandbox.contract import prepare_target, validate_output
+from autods.sandbox.contract import find_leaks, prepare_target, validate_output
 from autods.state import AgentState
 
 log = structlog.get_logger(__name__)
@@ -119,6 +119,29 @@ def basic_features(df: pd.DataFrame, target_column: str) -> pd.DataFrame:
     return features
 
 
+def drop_leaky_features(
+    original: pd.DataFrame, features: pd.DataFrame, target_column: str
+) -> tuple[pd.DataFrame, list[str]]:
+    """Remove encoded columns that near-perfectly track the target.
+
+    Generated code that leaks is sent back to the LLM to fix; the fallback has
+    no one to send it back to, so it fixes it itself. Without this, a single
+    text column that secretly copies the target (cohort = "K" for survivors)
+    makes the fallback fail validation and the run end with no features.
+
+    Args:
+        original: The prepared frame the features were built from.
+        features: Output of basic_features.
+        target_column: The target column name.
+
+    Returns:
+        The features without leaking columns, and the names dropped.
+    """
+    candidates = [c for c in features.columns if c != target_column]
+    new_leaks, _ = find_leaks(original, features, target_column, candidates)
+    return features.drop(columns=new_leaks), new_leaks
+
+
 def fallback_fe_node(state: AgentState) -> dict[str, Any]:
     """Graph node: build features with basic_features and write them to run_dir.
 
@@ -156,6 +179,9 @@ def fallback_fe_node(state: AgentState) -> dict[str, Any]:
     warnings = [] if n_attempts else list(notes)
 
     features = basic_features(df, decision.target_column)
+    features, leaked = drop_leaky_features(df, features, decision.target_column)
+    if leaked:
+        warnings.append(f"Fallback FE dropped columns that leak the target: {', '.join(leaked)}.")
     validation = validate_output(df, features, decision.target_column)
     if not validation.ok:
         log.error("fallback_fe.invalid", errors=validation.errors)

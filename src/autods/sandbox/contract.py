@@ -94,14 +94,25 @@ def _names(columns: list[str]) -> str:
     return shown + (f" and {extra} more" if extra > 0 else "")
 
 
-def _leakage(
+def find_leaks(
     original: pd.DataFrame, result: pd.DataFrame, target_column: str, features: list[str]
 ) -> tuple[list[str], list[str]]:
     """Find feature columns that near-perfectly track the target.
 
-    Returns (new_columns, original_columns) above the threshold. A new one was
-    created by the generated code, so it is an error to retry; an original one
-    is leakage in the dataset itself, which only a human can judge.
+    Shared by validate_output and the fallback FE, so both use one definition
+    of "leaks the target".
+
+    Args:
+        original: The frame before feature engineering.
+        result: The engineered frame, target included.
+        target_column: The target column name.
+        features: Numeric feature columns of result to check.
+
+    Returns:
+        (new_columns, original_columns) correlating above the threshold. A new
+        one was created by feature engineering, so it can be fixed there; an
+        original one is leakage in the dataset itself, which only a human can
+        judge.
     """
     target = result[target_column]
     mask = target.notna()
@@ -204,7 +215,7 @@ def validate_output(original: pd.DataFrame, result: object, target_column: str) 
         )
 
     if numeric and not with_nan and not with_inf:
-        new_leaks, original_leaks = _leakage(original, result, target_column, numeric)
+        new_leaks, original_leaks = find_leaks(original, result, target_column, numeric)
         if new_leaks:
             errors.append(
                 f"New columns {_names(new_leaks)} correlate above "

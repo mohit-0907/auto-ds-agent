@@ -179,6 +179,21 @@ def test_node_with_no_usable_features_warns_instead_of_writing(tmp_path: Path) -
     assert "Fallback FE failed validation" in update["warnings"][-1]
 
 
+def test_node_drops_a_text_copy_of_the_target_instead_of_failing(tmp_path: Path) -> None:
+    """The natural leakage trap: without the drop, the fallback would end the run empty."""
+    df = pd.read_csv(DATASETS / "Titanic-Dataset.csv")
+    df["cohort"] = df["Survived"].map({1: "K", 0: "M"})  # secretly the target
+    path = tmp_path / "leaky.csv"
+    df.to_csv(path, index=False)
+
+    update = fallback_fe_node(_state(tmp_path, path, "Survived", "binary_classification"))
+    features = pd.read_parquet(update["processed_data_path"])
+
+    assert not any(c.startswith("cohort") for c in features.columns)
+    assert any("leak the target: cohort_K, cohort_M" in w for w in update["warnings"])
+    assert "Sex_male" in features.columns  # honest features survive
+
+
 def test_node_without_a_decision_is_a_no_op(tmp_path: Path) -> None:
     assert fallback_fe_node(make_state(run_dir=str(tmp_path))) == {}
 

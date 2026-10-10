@@ -104,6 +104,12 @@ def test_graph_compiles_with_every_node() -> None:
         assert node in mermaid
 
 
+def test_readme_diagram_matches_the_graph() -> None:
+    """If this fails, the graph changed: run `uv run python scripts/render_graph.py`."""
+    committed = (PROJECT_ROOT / "docs" / "graph.mmd").read_text(encoding="utf-8")
+    assert committed == build_graph().get_graph().draw_mermaid()
+
+
 def test_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls = install_scripted_llm(
         monkeypatch, {TaskDecision: [ok_result(DECISION)], FECode: [ok_result(GOOD)]}
