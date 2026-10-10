@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "langchain-openai>=1.6.7",
+    "langgraph>=1.2.14",
     "pandas>=2.2",
     "pyarrow>=16.0",
     "pydantic>=2.7",
@@ -15,7 +16,7 @@ dependencies = [
 
 # Dependencies are added per phase, not up front:
 #   Phase 2  uv add langchain-openai  (done; add langchain-anthropic only to switch provider)
-#   Phase 4  uv add langgraph
+#   Phase 4  uv add langgraph  (done)
 #   Phase 5  uv add scikit-learn xgboost lightgbm
 #   Phase 6  uv add typer
 #   Phase 7  uv add streamlit

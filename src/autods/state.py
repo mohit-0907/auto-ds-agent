@@ -200,7 +200,6 @@ class AgentState(TypedDict):
     fe_explanations: Annotated[list[str], operator.add]
     tracebacks: Annotated[list[str], operator.add]
     processed_data_path: str | None
-    n_retries: int
     leaderboard: list[ModelResult]
     best_model_id: str | None
     report: str | None
