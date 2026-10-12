@@ -147,7 +147,14 @@ SANITY_FLAGGED_CONFIDENCE = 0.5
 
 RANDOM_STATE = 42  # Invariant 8: fixed everywhere, the arena must be reproducible.
 CV_FOLDS = 5
+# Parallelism lives across CV folds; every estimator is single-threaded
+# (n_jobs=1). Two nested layers of threads oversubscribe the CPU, and
+# multithreaded boosting can vary in the last decimals between runs.
 CV_N_JOBS = -1
+# Sensible library-style defaults, not tuned (no heavy HPO in v1). Shared by
+# the forest and boosting candidates so they compete on similar budgets.
+ARENA_N_ESTIMATORS = 300
+ARENA_LEARNING_RATE = 0.05
 MODEL_FIT_TIMEOUT_S = 300
 
 # --- Logging ---------------------------------------------------------------
