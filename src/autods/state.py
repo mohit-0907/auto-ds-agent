@@ -162,7 +162,16 @@ class ModelResult(BaseModel):
         description="Key in metrics that the leaderboard ranks on. Determined by the "
         "task type before any model is fitted, so it is set even when status is 'failed'."
     )
-    training_time_s: float = Field(ge=0, default=0.0, description="Total fit time in seconds.")
+    training_time_s: float = Field(
+        ge=0, default=0.0, description="Fit time summed over all CV folds, in seconds."
+    )
+    predict_time_s: float = Field(
+        ge=0,
+        default=0.0,
+        description="Mean time to predict and score one CV test fold, in seconds (scikit-"
+        "learn's score_time; dominated by prediction). Measured, so the report's "
+        "inference-cost trade-offs rest on numbers, not LLM guesses.",
+    )
     error: str | None = Field(default=None, description="Failure message when status is 'failed'.")
 
 
