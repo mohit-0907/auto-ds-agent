@@ -62,6 +62,24 @@ def test_full_arena_on_titanic(tmp_path: Path) -> None:
     assert {"roc_auc", "roc_auc_std", "training_time_s", "predict_time_s"} <= set(csv.columns)
 
 
+def comparable(update: dict) -> tuple:
+    """Everything the arena decides, minus wall-clock timings (which always vary)."""
+    rows = [
+        (r.model_id, r.status, r.metrics, r.metrics_std, r.fold_scores)
+        for r in update["leaderboard"]
+    ]
+    return update["best_model_id"], rows
+
+
+def test_dod_same_features_give_an_identical_leaderboard(tmp_path: Path) -> None:
+    """Phase 5 DoD, offline: fixed seeds make the full 6-model arena reproducible."""
+    state = _state(tmp_path, "Titanic-Dataset.csv", "Survived", "binary_classification")
+    first, second = arena_node(state), arena_node(state)
+
+    assert comparable(first) == comparable(second)
+    assert first["best_model_id"] != "dummy"
+
+
 def test_regression_leaderboard_is_ranked_lowest_rmse_first(
     tmp_path: Path, quick_arena: None
 ) -> None:

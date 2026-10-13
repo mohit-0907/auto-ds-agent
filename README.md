@@ -8,9 +8,9 @@ best pipeline with a written justification.
 statistic, and training run is deterministic. The LLM is confined to three nodes —
 task routing, feature-engineering codegen, and the final report.
 
-Status: **Phase 4 of 8 — the agent runs end to end up to model-ready features** (profiling,
-task routing, self-repairing feature engineering, fallback). Model benchmarking (Phase 5)
-and the written report (Phase 6) are next.
+Status: **Phase 5 of 8 — the agent runs end to end from a CSV to a ranked model
+leaderboard** (profiling, task routing, self-repairing feature engineering, fallback,
+cross-validated model arena). The written report and CLI (Phase 6) are next.
 
 See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
 
@@ -27,7 +27,12 @@ Dashed arrows are decisions made in code by reading the shared state:
   goes back to the LLM. At most 3 attempts, enforced by the graph, not the prompt.
 - **→ fallback_fe** after 3 failures, or if the LLM cannot be reached: a deterministic
   pandas recipe, so the run degrades instead of failing.
-- **sandbox → arena** on success (currently the end of the run; the arena is Phase 5).
+- **→ arena** once features exist: six models (a dummy baseline, a linear model, random
+  forest, HistGradientBoosting, XGBoost, LightGBM) are cross-validated on the same five
+  folds. The best mean wins only if it beats every simpler model on at least 4 of 5 folds;
+  otherwise the simpler model wins. Given the same features, the leaderboard is identical
+  on every run. (The generated feature code itself can vary between runs: current LLMs do
+  not accept temperature 0.)
 
 The diagram is generated from the code (`uv run python scripts/render_graph.py`); a test
 fails if `docs/graph.mmd` no longer matches the graph.
