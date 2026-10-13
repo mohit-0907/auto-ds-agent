@@ -6,14 +6,15 @@ function is a few lines, testable with a dict, no LLM or graph needed.
 
     profiler -> router -> sanity_check -+- no usable decision --> END
                                         +-> fe_codegen
-    fe_codegen -+- LLM call failed ------------------------> fallback_fe -> END
-                +-> sandbox -+- passed ---------------------> arena (END for now)
+    fe_codegen -+- LLM call failed ------------------------> fallback_fe
+                +-> sandbox -+- passed ---------------------> arena -> END
                              +- failed, attempts left ------> fe_codegen (retry)
                              +- failed MAX_FE_ATTEMPTS -----> fallback_fe
+    fallback_fe -+- produced features ----------------------> arena
+                 +- failed too -----------------------------> END
 
-Early exits go to END until the reporter exists (Phase 6), and "arena" is a
-named route pointing at END until the arena exists (Phase 5); each is a
-one-line change in build_graph when its node arrives.
+Early exits go to END until the reporter exists (Phase 6); that is a one-line
+change in build_graph when it arrives.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from autods.config import MAX_FE_ATTEMPTS, RUNS_DIR
+from autods.nodes.arena import arena_node
 from autods.nodes.fallback_fe import fallback_fe_node
 from autods.nodes.fe_codegen import fe_codegen_node
 from autods.nodes.profiler import profiler_node
@@ -77,6 +79,11 @@ def route_after_execution(state: AgentState) -> Literal["arena", "fe_codegen", "
     return "fallback_fe"
 
 
+def route_after_fallback(state: AgentState) -> Literal["arena", "end"]:
+    """The fallback can fail too (e.g. no usable column at all); then there is nothing to train."""
+    return "arena" if state["processed_data_path"] is not None else "end"
+
+
 def build_graph() -> CompiledStateGraph:
     """Wire every node and edge, and compile.
 
@@ -92,6 +99,7 @@ def build_graph() -> CompiledStateGraph:
     graph.add_node("fe_codegen", fe_codegen_node)
     graph.add_node("sandbox", sandbox_node)
     graph.add_node("fallback_fe", fallback_fe_node)
+    graph.add_node("arena", arena_node)
 
     graph.add_edge(START, "profiler")
     # A failed profile needs no special edge: the router skips when there is no
@@ -107,9 +115,10 @@ def build_graph() -> CompiledStateGraph:
     graph.add_conditional_edges(
         "sandbox",
         route_after_execution,
-        {"arena": END, "fe_codegen": "fe_codegen", "fallback_fe": "fallback_fe"},
+        {"arena": "arena", "fe_codegen": "fe_codegen", "fallback_fe": "fallback_fe"},
     )
-    graph.add_edge("fallback_fe", END)
+    graph.add_conditional_edges("fallback_fe", route_after_fallback, {"arena": "arena", "end": END})
+    graph.add_edge("arena", END)
 
     return graph.compile()
 

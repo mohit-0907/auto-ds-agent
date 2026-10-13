@@ -162,6 +162,12 @@ class ModelResult(BaseModel):
         description="Key in metrics that the leaderboard ranks on. Determined by the "
         "task type before any model is fitted, so it is set even when status is 'failed'."
     )
+    fold_scores: list[float] = Field(
+        default_factory=list,
+        description="The primary metric on each CV fold, in fold order. Every model faces "
+        "the same folds, so these pair up across models for the fold-by-fold comparison "
+        "that picks the best model.",
+    )
     training_time_s: float = Field(
         ge=0, default=0.0, description="Fit time summed over all CV folds, in seconds."
     )

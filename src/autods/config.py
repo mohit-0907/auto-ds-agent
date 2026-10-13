@@ -147,14 +147,28 @@ SANITY_FLAGGED_CONFIDENCE = 0.5
 
 RANDOM_STATE = 42  # Invariant 8: fixed everywhere, the arena must be reproducible.
 CV_FOLDS = 5
-# Parallelism lives across CV folds; every estimator is single-threaded
-# (n_jobs=1). Two nested layers of threads oversubscribe the CPU, and
-# multithreaded boosting can vary in the last decimals between runs.
-CV_N_JOBS = -1
+# Folds run one after another. Measured on Windows: ridge CV on Ames took 0.19 s
+# sequential vs 3.4 s with n_jobs=-1 -- each worker is a new process that must
+# import pandas/sklearn/xgboost/lightgbm and receive a copy of the data, and
+# hgb's own OpenMP threads inside every worker oversubscribed the CPU (one test
+# went from 17 s to 122 s).
+CV_N_JOBS = 1
+# Every model is single-threaded too, random forest included. Its trees are
+# seeded one by one, so training is identical with any n_jobs -- but with
+# n_jobs=-1 predict_proba sums the trees' votes across threads in whatever
+# order they finish, and float addition is order-dependent: the same fitted
+# forest predicted twice differed by 2.2e-16. Tiny, but invariant 8 asks for
+# the same answer every run, and the determinism test caught it.
+RF_N_JOBS = 1
 # Sensible library-style defaults, not tuned (no heavy HPO in v1). Shared by
 # the forest and boosting candidates so they compete on similar budgets.
 ARENA_N_ESTIMATORS = 300
 ARENA_LEARNING_RATE = 0.05
+# The top model must beat a simpler one on at least this share of the shared CV
+# folds to be chosen over it. If two models were truly equal, each fold would be
+# a coin flip: winning >= 3 of 5 happens 50% of the time by luck, >= 4 of 5
+# about 19%, 5 of 5 about 3%. So a bare majority is no evidence; 0.8 is.
+SELECTION_MIN_FOLD_WIN_RATE = 0.8
 MODEL_FIT_TIMEOUT_S = 300
 
 # --- Logging ---------------------------------------------------------------

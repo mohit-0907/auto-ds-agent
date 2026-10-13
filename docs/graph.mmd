@@ -11,18 +11,21 @@ graph TD;
 	fe_codegen(fe_codegen)
 	sandbox(sandbox)
 	fallback_fe(fallback_fe)
+	arena(arena)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> profiler;
+	fallback_fe -. &nbsp;end&nbsp; .-> __end__;
+	fallback_fe -.-> arena;
 	fe_codegen -.-> fallback_fe;
 	fe_codegen -.-> sandbox;
 	profiler --> router;
 	router --> sanity_check;
-	sandbox -. &nbsp;arena&nbsp; .-> __end__;
+	sandbox -.-> arena;
 	sandbox -.-> fallback_fe;
 	sandbox -.-> fe_codegen;
 	sanity_check -. &nbsp;end&nbsp; .-> __end__;
 	sanity_check -.-> fe_codegen;
-	fallback_fe --> __end__;
+	arena --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc

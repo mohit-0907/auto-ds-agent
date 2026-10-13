@@ -157,13 +157,15 @@ def evaluate_candidate(
             error=error,
         )
 
-    metrics, metrics_std = {}, {}
+    metrics, metrics_std, fold_scores = {}, {}, []
     for name in _METRICS[task_type]:
         values = scores[f"test_{name}"]
         if name in NEGATED:
             values = -values
         metrics[name] = float(np.mean(values))
         metrics_std[name] = float(np.std(values))
+        if name == primary:
+            fold_scores = [float(v) for v in values]
 
     return ModelResult(
         model_id=candidate.model_id,
@@ -172,6 +174,7 @@ def evaluate_candidate(
         metrics=metrics,
         metrics_std=metrics_std,
         primary_metric=primary,
+        fold_scores=fold_scores,
         training_time_s=float(np.sum(scores["fit_time"])),
         predict_time_s=float(np.mean(scores["score_time"])),
     )

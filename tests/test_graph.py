@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from autods.arena.candidates import candidates
 from autods.config import MAX_FE_ATTEMPTS, PROJECT_ROOT
 from autods.graph import (
     RECURSION_LIMIT,
@@ -16,12 +17,23 @@ from autods.graph import (
     new_run_dir,
     route_after_codegen,
     route_after_execution,
+    route_after_fallback,
     route_after_sanity_check,
 )
 from autods.state import AgentState, FECode, TaskDecision
 from tests.helpers import install_scripted_llm, make_state, ok_result
 
 TITANIC = PROJECT_ROOT / "datasets" / "Titanic-Dataset.csv"
+
+
+@pytest.fixture(autouse=True)
+def quick_arena(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests are about routing, so the arena runs only dummy + logreg."""
+    monkeypatch.setattr(
+        "autods.nodes.arena.candidates",
+        lambda task_type: [c for c in candidates(task_type) if c.model_id in {"dummy", "logreg"}],
+    )
+
 
 DECISION = TaskDecision(
     task_type="binary_classification", target_column="Survived", reasoning="r", confidence=0.95
@@ -95,12 +107,18 @@ def test_route_after_execution(n_attempts: int, processed: str | None, expected:
     assert route_after_execution(state) == expected
 
 
+@pytest.mark.parametrize(("processed", "expected"), [("features.parquet", "arena"), (None, "end")])
+def test_route_after_fallback(processed: str | None, expected: str) -> None:
+    assert route_after_fallback(make_state(processed_data_path=processed)) == expected
+
+
 # --- The compiled graph --------------------------------------------------------------
 
 
 def test_graph_compiles_with_every_node() -> None:
     mermaid = build_graph().get_graph().draw_mermaid()
-    for node in ["profiler", "router", "sanity_check", "fe_codegen", "sandbox", "fallback_fe"]:
+    nodes = ["profiler", "router", "sanity_check", "fe_codegen", "sandbox", "fallback_fe", "arena"]
+    for node in nodes:
         assert node in mermaid
 
 
@@ -123,6 +141,10 @@ def test_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert final["tracebacks"] == []
     assert calls == {TaskDecision: 1, FECode: 1}
     assert final["token_cost_usd"] > 0  # router + codegen, summed by the reducer
+    # ...and on through the arena: CSV in, ranked models out.
+    assert final["best_model_id"] == "logreg"
+    assert [r.model_id for r in final["leaderboard"]] == ["logreg", "dummy"]
+    assert (Path(final["run_dir"]) / "leaderboard.csv").exists()
 
 
 def test_broken_first_attempt_is_repaired(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -149,6 +171,7 @@ def test_three_failures_fall_back(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert calls[FECode] == MAX_FE_ATTEMPTS  # the bound held: no fourth attempt
     assert final["processed_data_path"].endswith(str(Path("fe", "fallback", "features.parquet")))
     assert any(f"after {MAX_FE_ATTEMPTS} failed" in w for w in final["warnings"])
+    assert final["best_model_id"] == "logreg"  # the spare tyre still reaches the arena
 
 
 def test_codegen_api_down_goes_straight_to_fallback(

@@ -4,10 +4,12 @@ Every list starts with a dummy baseline: a model that ignores the features
 entirely. A candidate that cannot beat it has learned nothing, whatever its
 score looks like in isolation.
 
-Determinism (invariant 8): every estimator with randomness gets RANDOM_STATE
-and runs single-threaded (n_jobs=1); the arena parallelizes across CV folds
-instead. LightGBM additionally gets deterministic=True with row-wise histograms,
-its documented recipe for bit-identical results.
+Determinism (invariant 8): every estimator with randomness gets RANDOM_STATE,
+and every model runs single-threaded: multithreaded sums are added in whatever
+order threads finish, and float addition is order-dependent (see RF_N_JOBS and
+CV_N_JOBS in config for the measured cases). LightGBM also gets
+deterministic=True with row-wise histograms, its documented recipe for
+bit-identical results.
 
 Scaling: linear models get StandardScaler inside their own pipeline; tree
 models get raw features. Neither feature engineering path scales, so this is
@@ -33,7 +35,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier, XGBRegressor
 
-from autods.config import ARENA_LEARNING_RATE, ARENA_N_ESTIMATORS, RANDOM_STATE
+from autods.config import ARENA_LEARNING_RATE, ARENA_N_ESTIMATORS, RANDOM_STATE, RF_N_JOBS
 
 # The metric each task type's leaderboard ranks on. Chosen before any model is
 # fitted, so a failed model still reports which metric it was competing on.
@@ -74,7 +76,9 @@ def _classifiers() -> list[Candidate]:
         Candidate(
             model_id="rf",
             model_name="Random Forest",
-            estimator=RandomForestClassifier(n_estimators=ARENA_N_ESTIMATORS, n_jobs=1, **_SEED),
+            estimator=RandomForestClassifier(
+                n_estimators=ARENA_N_ESTIMATORS, n_jobs=RF_N_JOBS, **_SEED
+            ),
         ),
         Candidate(
             model_id="hgb",
@@ -109,7 +113,9 @@ def _regressors() -> list[Candidate]:
         Candidate(
             model_id="rf",
             model_name="Random Forest",
-            estimator=RandomForestRegressor(n_estimators=ARENA_N_ESTIMATORS, n_jobs=1, **_SEED),
+            estimator=RandomForestRegressor(
+                n_estimators=ARENA_N_ESTIMATORS, n_jobs=RF_N_JOBS, **_SEED
+            ),
         ),
         Candidate(
             model_id="hgb",
