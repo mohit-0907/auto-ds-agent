@@ -141,6 +141,35 @@ class FECode(BaseModel):
     )
 
 
+class ReportNarrative(BaseModel):
+    """The reporter LLM's prose, one field per report section.
+
+    LLM-authored via .with_structured_output(ReportNarrative). Python builds
+    every table and assembles the Markdown around these fields; every number
+    in them is checked against the facts sheet before the report is written.
+    """
+
+    summary: str = Field(
+        description="Two or three sentences: what was predicted, which model is recommended, "
+        "and how much better it is than the baseline."
+    )
+    task: str = Field(
+        description="Which task type and target were chosen and why, in two to four sentences."
+    )
+    features: str = Field(
+        description="What feature engineering was applied. If any attempt failed, say what "
+        "went wrong and how it was fixed, or that the fallback was used."
+    )
+    recommendation: str = Field(
+        description="The recommended model and why, with trade-offs: accuracy versus "
+        "prediction cost versus interpretability, using only numbers from the facts."
+    )
+    caveats: str = Field(
+        description="Limitations of this result and concrete next steps, based on the "
+        "warnings and facts. Three to five short bullet points as Markdown."
+    )
+
+
 class ModelResult(BaseModel):
     """One candidate model's cross-validated performance in the arena.
 
