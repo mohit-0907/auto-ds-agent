@@ -124,8 +124,8 @@ def test_facts_explain_a_simpler_winner() -> None:
         make_state(dataset_path="x.csv", leaderboard=[top, simple], best_model_id="logreg")
     )
     assert (
-        "LightGBM had the highest mean ROC-AUC (0.882) but beat Logistic Regression on only 3 of 5"
-        in facts
+        "LightGBM had the best mean ROC-AUC (0.882, higher is better) but beat Logistic Regression "
+        "on only 3 of 5" in facts
     )
 
 

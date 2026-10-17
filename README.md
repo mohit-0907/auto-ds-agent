@@ -8,9 +8,9 @@ best pipeline with a written justification.
 statistic, and training run is deterministic. The LLM is confined to three nodes —
 task routing, feature-engineering codegen, and the final report.
 
-Status: **Phase 5 of 8 — the agent runs end to end from a CSV to a ranked model
-leaderboard** (profiling, task routing, self-repairing feature engineering, fallback,
-cross-validated model arena). The written report and CLI (Phase 6) are next.
+Status: **Phase 6 of 8 — one command takes a CSV to a written, number-verified report**
+(profiling, task routing, self-repairing feature engineering, fallback, cross-validated
+model arena, report, saved model). A Streamlit UI (Phase 7) is next.
 
 See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
 
@@ -44,6 +44,11 @@ uv sync
 cp .env.example .env          # then set OPENAI_API_KEY
 uv run autods run datasets/Titanic-Dataset.csv --description "Predict who survived"
 ```
+
+**Example output:** [`docs/example_run/report.md`](docs/example_run/report.md), produced by
+one command on a dataset the agent had never seen (car fuel efficiency, no target given),
+with the generated [`fe_code.py`](docs/example_run/fe_code.py) and
+[`leaderboard.csv`](docs/example_run/leaderboard.csv).
 
 Each run gets its own folder under `runs/` with `report.md`, `leaderboard.csv`,
 `best_pipeline.joblib`, `fe_code.py` and `run.json`. `--target` names the column to predict

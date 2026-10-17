@@ -90,6 +90,17 @@ def test_simpler_model_wins_a_tie() -> None:
     assert "held on only 2 of 5 folds" in notes[0]
 
 
+def test_tie_note_for_rmse_says_better_not_higher() -> None:
+    """Found on the mpg run: the note called a lower (better) RMSE "higher"."""
+    ridge = _result("ridge", [3.0, 3.0, 3.0, 3.0, 3.0], metric="rmse")
+    rf = _result("rf", [2.9, 3.1, 2.9, 3.1, 2.7], metric="rmse")  # better mean, wins 3/5
+    best, notes = select_best([_result("dummy", [8.0] * 5, metric="rmse"), ridge, rf])
+
+    assert best == "ridge"
+    assert "RF's better mean rmse (2.9400 vs 3.0000, lower is better)" in notes[0]
+    assert "higher mean" not in notes[0]
+
+
 def test_the_simplest_untied_model_is_chosen() -> None:
     """lgbm tops the mean; it clearly beats logreg but not hgb, so hgb wins."""
     logreg = _result("logreg", [0.80, 0.80, 0.80, 0.80, 0.80])

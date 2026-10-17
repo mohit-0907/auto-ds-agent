@@ -107,10 +107,13 @@ def select_best(results: list[ModelResult]) -> tuple[str | None, list[str]]:
         if not clearly_beats(top, simpler):
             chosen = simpler
             wins, n = fold_wins(top, simpler), len(top.fold_scores)
+            # "better", not "higher": for RMSE the better mean is the lower one.
+            direction = "lower" if top.primary_metric in LOWER_IS_BETTER else "higher"
             notes.append(
                 f"Chose {simpler.model_name} over {top.model_name}: {top.model_name}'s "
-                f"higher mean {top.primary_metric} ({_mean(top):.4f} vs {_mean(simpler):.4f}) "
-                f"held on only {wins} of {n} folds, so the simpler model wins the tie."
+                f"better mean {top.primary_metric} ({_mean(top):.4f} vs {_mean(simpler):.4f}, "
+                f"{direction} is better) held on only {wins} of {n} folds, so the simpler "
+                "model wins the tie."
             )
             break
 

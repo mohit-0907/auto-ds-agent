@@ -99,8 +99,9 @@ def _arena_facts(leaderboard: list[ModelResult], best_model_id: str | None) -> l
     )
     if top.model_id != best.model_id:
         facts.append(
-            f"- {top.model_name} had the highest mean {label} "
-            f"({fmt(top.metrics[metric])}) but beat {best.model_name} on only "
+            f"- {top.model_name} had the best mean {label} "
+            f"({fmt(top.metrics[metric])}, {'lower' if lower else 'higher'} is better) "
+            f"but beat {best.model_name} on only "
             f"{fold_wins(top, best)} of {n_folds} folds, so the simpler {best.model_name} "
             "was chosen."
         )
