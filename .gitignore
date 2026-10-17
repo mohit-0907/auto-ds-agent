@@ -26,3 +26,7 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Web frontend (installed packages and build output)
+web/node_modules/
+web/dist/
