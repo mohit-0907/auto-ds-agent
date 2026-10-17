@@ -40,6 +40,7 @@ name = "auto-ds-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "joblib" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "lightgbm" },
@@ -61,6 +62,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "joblib", specifier = ">=1.6.0" },
     { name = "langchain-openai", specifier = ">=1.6.7" },
     { name = "langgraph", specifier = ">=1.2.14" },
     { name = "lightgbm", specifier = ">=4.7.0" },

@@ -45,6 +45,20 @@ uv run pytest
 uv run ruff check src/ --fix
 ```
 
+## Known limitations
+
+- **The sandbox is isolation, not security.** Generated code runs in a separate process with
+  a timeout, a stripped environment (no API keys), an import allowlist and, on Linux/macOS, a
+  memory cap. It still shares the filesystem and network with the host; real security needs a
+  container. The import check stops accidental harm, not a determined adversary.
+- **Generated feature code is batch-stateless.** It computes medians and categories from
+  whatever frame it receives, so `best_pipeline.joblib` is for re-scoring batches (run
+  `fe_code.py`, then align to the saved `feature_columns`), not single-row serving.
+- **Only load `best_pipeline.joblib` files you created.** Like any pickle-based format,
+  loading one executes code.
+- **Feature code can differ between runs.** Current LLMs do not accept temperature 0. Given
+  the same features, the model arena's results are identical on every run.
+
 ## Out of scope (v1)
 
 Deep learning · NLP · computer vision · time series forecasting · multi-table joins ·

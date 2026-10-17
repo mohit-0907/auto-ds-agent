@@ -5,6 +5,7 @@ description = "LangGraph agent that profiles a tabular dataset, infers the ML ta
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "joblib>=1.6.0",
     "langchain-openai>=1.6.7",
     "langgraph>=1.2.14",
     "lightgbm>=4.7.0",
