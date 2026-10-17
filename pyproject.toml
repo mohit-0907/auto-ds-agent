@@ -15,14 +15,15 @@ dependencies = [
     "python-dotenv>=1.0",
     "scikit-learn>=1.9.1",
     "structlog>=24.1",
+    "typer>=0.27.3",
     "xgboost>=3.2.0",
 ]
 
 # Dependencies are added per phase, not up front:
 #   Phase 2  uv add langchain-openai  (done; add langchain-anthropic only to switch provider)
 #   Phase 4  uv add langgraph  (done)
-#   Phase 5  uv add scikit-learn xgboost lightgbm
-#   Phase 6  uv add typer
+#   Phase 5  uv add scikit-learn xgboost lightgbm joblib  (done)
+#   Phase 6  uv add typer  (done)
 #   Phase 7  uv add streamlit
 
 [dependency-groups]
@@ -31,9 +32,8 @@ dev = [
     "ruff>=0.5",
 ]
 
-# [project.scripts] is deliberately absent until Phase 6 creates src/autods/cli.py.
-# Declaring `autods = "autods.cli:app"` now installs fine but fails at invocation
-# with an ImportError, which reads as a broken environment rather than a missing file.
+[project.scripts]
+autods = "autods.cli:app"
 
 [build-system]
 requires = ["hatchling"]

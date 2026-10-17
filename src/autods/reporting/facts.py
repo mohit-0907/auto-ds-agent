@@ -128,7 +128,10 @@ def _arena_facts(leaderboard: list[ModelResult], best_model_id: str | None) -> l
             f"{fold_wins(best, other)} of {n_folds} folds."
         )
 
-    fastest = min(ok.values(), key=lambda r: r.predict_time_s)
+    # Against the fastest *real* model: the dummy does no work, so it is always
+    # fastest and would make every real model look slow ("2.9x the baseline").
+    real = [r for r in ok.values() if r.model_id != BASELINE_ID]
+    fastest = min(real, key=lambda r: r.predict_time_s)
     if fastest.model_id != best.model_id and fastest.predict_time_s > 0:
         ratio = best.predict_time_s / fastest.predict_time_s
         facts.append(

@@ -78,8 +78,8 @@ def _run(tmp_path: Path, dataset: Path = TITANIC) -> AgentState:
 @pytest.mark.parametrize(
     ("decision", "expected"),
     [
-        (None, "end"),
-        (_decision("unsupported"), "end"),
+        (None, "report"),
+        (_decision("unsupported"), "report"),
         (_decision("regression"), "fe_codegen"),
     ],
 )
@@ -107,7 +107,9 @@ def test_route_after_execution(n_attempts: int, processed: str | None, expected:
     assert route_after_execution(state) == expected
 
 
-@pytest.mark.parametrize(("processed", "expected"), [("features.parquet", "arena"), (None, "end")])
+@pytest.mark.parametrize(
+    ("processed", "expected"), [("features.parquet", "arena"), (None, "report")]
+)
 def test_route_after_fallback(processed: str | None, expected: str) -> None:
     assert route_after_fallback(make_state(processed_data_path=processed)) == expected
 

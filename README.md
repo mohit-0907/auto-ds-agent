@@ -37,6 +37,19 @@ Dashed arrows are decisions made in code by reading the shared state:
 The diagram is generated from the code (`uv run python scripts/render_graph.py`); a test
 fails if `docs/graph.mmd` no longer matches the graph.
 
+## Usage
+
+```bash
+uv sync
+cp .env.example .env          # then set OPENAI_API_KEY
+uv run autods run datasets/Titanic-Dataset.csv --description "Predict who survived"
+```
+
+Each run gets its own folder under `runs/` with `report.md`, `leaderboard.csv`,
+`best_pipeline.joblib`, `fe_code.py` and `run.json`. `--target` names the column to predict
+(otherwise it is inferred); `--verbose` shows detailed logs. Exit codes: `0` a model was
+recommended, `2` bad command line, `3` the run ended without a model (the report says why).
+
 ## Development
 
 ```bash

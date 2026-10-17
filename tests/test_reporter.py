@@ -29,7 +29,7 @@ def _result(model_id: str, name: str, folds: list[float], predict_s: float = 0.0
 LEADERBOARD = [
     _result("hgb", "Hist Gradient Boosting", [0.90, 0.89, 0.87, 0.88, 0.87], predict_s=0.021),
     _result("logreg", "Logistic Regression", [0.86, 0.85, 0.84, 0.86, 0.85], predict_s=0.015),
-    _result("dummy", "Dummy (class priors)", [0.5] * 5, predict_s=0.016),
+    _result("dummy", "Dummy (class priors)", [0.5] * 5, predict_s=0.004),
 ]
 
 
@@ -112,6 +112,9 @@ def test_facts_carry_python_computed_comparisons(finished: dict) -> None:
     assert "Hist Gradient Boosting was better on 5 of 5 folds" in facts
     assert "The best model is 0.382 higher" in facts  # vs the 0.500 dummy, computed here
     assert "(1.4× as long)" in facts  # 21 ms vs 15 ms, computed here
+    # ...against the fastest real model, never the do-nothing dummy (4 ms here).
+    assert "15.0 ms for Logistic Regression" in facts
+    assert "for Dummy" not in facts
 
 
 def test_facts_explain_a_simpler_winner() -> None:

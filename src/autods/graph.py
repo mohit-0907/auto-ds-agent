@@ -4,17 +4,18 @@ Nodes do the work and write results into state; the routing functions below
 read state and pick the next node. Routing is plain Python on purpose -- each
 function is a few lines, testable with a dict, no LLM or graph needed.
 
-    profiler -> router -> sanity_check -+- no usable decision --> END
+    profiler -> router -> sanity_check -+- no usable decision --> reporter
                                         +-> fe_codegen
     fe_codegen -+- LLM call failed ------------------------> fallback_fe
-                +-> sandbox -+- passed ---------------------> arena -> END
+                +-> sandbox -+- passed ---------------------> arena
                              +- failed, attempts left ------> fe_codegen (retry)
                              +- failed MAX_FE_ATTEMPTS -----> fallback_fe
     fallback_fe -+- produced features ----------------------> arena
-                 +- failed too -----------------------------> END
+                 +- failed too -----------------------------> reporter
+    arena -> artifacts -> reporter -> finalize -> END
 
-Early exits go to END until the reporter exists (Phase 6); that is a one-line
-change in build_graph when it arrives.
+Every path ends in reporter -> finalize, so every run -- including one that
+stops early -- leaves a report.md and a run.json explaining what happened.
 """
 
 from __future__ import annotations
@@ -28,22 +29,25 @@ from langgraph.graph.state import CompiledStateGraph
 
 from autods.config import MAX_FE_ATTEMPTS, RUNS_DIR
 from autods.nodes.arena import arena_node
+from autods.nodes.artifacts import artifacts_node, finalize_node
 from autods.nodes.fallback_fe import fallback_fe_node
 from autods.nodes.fe_codegen import fe_codegen_node
 from autods.nodes.profiler import profiler_node
+from autods.nodes.reporter import reporter_node
 from autods.nodes.router import router_node
 from autods.nodes.sandbox import sandbox_node
 from autods.nodes.sanity_check import sanity_check_node
 from autods.state import AgentState
 
-# Each node runs once except fe_codegen and sandbox, which run up to
-# MAX_FE_ATTEMPTS times each. The routing functions enforce the real bound
-# (invariant 5); this is a second net that turns a future routing bug into a
-# clean GraphRecursionError instead of an endless loop.
-RECURSION_LIMIT = 10 + 2 * MAX_FE_ATTEMPTS
+# The longest path runs profiler, router, sanity_check, MAX_FE_ATTEMPTS x
+# (fe_codegen + sandbox), fallback_fe, arena, artifacts, reporter, finalize:
+# 2 * MAX_FE_ATTEMPTS + 8 steps. The routing functions enforce the real bound
+# (invariant 5); this is a second net, with a little headroom, that turns a
+# future routing bug into a clean GraphRecursionError instead of an endless loop.
+RECURSION_LIMIT = 2 * MAX_FE_ATTEMPTS + 10
 
 
-def route_after_sanity_check(state: AgentState) -> Literal["fe_codegen", "end"]:
+def route_after_sanity_check(state: AgentState) -> Literal["fe_codegen", "report"]:
     """Continue only with a supported task decision.
 
     No decision means profiling or routing failed (each already left a
@@ -51,7 +55,7 @@ def route_after_sanity_check(state: AgentState) -> Literal["fe_codegen", "end"]:
     """
     decision = state["task_decision"]
     if decision is None or decision.task_type == "unsupported":
-        return "end"
+        return "report"
     return "fe_codegen"
 
 
@@ -79,9 +83,9 @@ def route_after_execution(state: AgentState) -> Literal["arena", "fe_codegen", "
     return "fallback_fe"
 
 
-def route_after_fallback(state: AgentState) -> Literal["arena", "end"]:
+def route_after_fallback(state: AgentState) -> Literal["arena", "report"]:
     """The fallback can fail too (e.g. no usable column at all); then there is nothing to train."""
-    return "arena" if state["processed_data_path"] is not None else "end"
+    return "arena" if state["processed_data_path"] is not None else "report"
 
 
 def build_graph() -> CompiledStateGraph:
@@ -100,14 +104,17 @@ def build_graph() -> CompiledStateGraph:
     graph.add_node("sandbox", sandbox_node)
     graph.add_node("fallback_fe", fallback_fe_node)
     graph.add_node("arena", arena_node)
+    graph.add_node("artifacts", artifacts_node)
+    graph.add_node("reporter", reporter_node)
+    graph.add_node("finalize", finalize_node)
 
     graph.add_edge(START, "profiler")
     # A failed profile needs no special edge: the router skips when there is no
-    # profile, and route_after_sanity_check then ends the run.
+    # profile, and route_after_sanity_check then sends the run to the reporter.
     graph.add_edge("profiler", "router")
     graph.add_edge("router", "sanity_check")
     graph.add_conditional_edges(
-        "sanity_check", route_after_sanity_check, {"fe_codegen": "fe_codegen", "end": END}
+        "sanity_check", route_after_sanity_check, {"fe_codegen": "fe_codegen", "report": "reporter"}
     )
     graph.add_conditional_edges(
         "fe_codegen", route_after_codegen, {"sandbox": "sandbox", "fallback_fe": "fallback_fe"}
@@ -117,8 +124,13 @@ def build_graph() -> CompiledStateGraph:
         route_after_execution,
         {"arena": "arena", "fe_codegen": "fe_codegen", "fallback_fe": "fallback_fe"},
     )
-    graph.add_conditional_edges("fallback_fe", route_after_fallback, {"arena": "arena", "end": END})
-    graph.add_edge("arena", END)
+    graph.add_conditional_edges(
+        "fallback_fe", route_after_fallback, {"arena": "arena", "report": "reporter"}
+    )
+    graph.add_edge("arena", "artifacts")
+    graph.add_edge("artifacts", "reporter")
+    graph.add_edge("reporter", "finalize")
+    graph.add_edge("finalize", END)
 
     return graph.compile()
 
