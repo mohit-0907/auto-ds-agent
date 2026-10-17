@@ -3,6 +3,7 @@
     POST /api/runs            upload a dataset + description -> start a run (202)
     GET  /api/runs            run history, newest first
     GET  /api/runs/{run_id}   one run: status, stage events, and results once finished
+    GET  /api/runs/{run_id}/events   live stage events as Server-Sent Events
     GET  /api/health          liveness check
 
 Interactive documentation is generated automatically at /docs.
@@ -10,16 +11,27 @@ Interactive documentation is generated automatically at /docs.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 import shutil
+import time
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from autods.api.runs import RunConflictError, RunListItem, RunManager, RunSummary
-from autods.config import MAX_DATASET_MB, RUNS_DIR, SUPPORTED_EXTENSIONS
+from autods.config import (
+    MAX_DATASET_MB,
+    RUNS_DIR,
+    SSE_KEEPALIVE_S,
+    SSE_POLL_INTERVAL_S,
+    SUPPORTED_EXTENSIONS,
+)
 from autods.graph import new_run_dir
 
 _CHUNK = 1024 * 1024  # uploads are copied to disk 1 MB at a time, never held whole in memory
@@ -51,6 +63,42 @@ def _save_upload(upload: UploadFile, destination: Path, limit_mb: float) -> None
             out.write(chunk)
     if written == 0:
         raise HTTPException(400, "The uploaded file is empty.")
+
+
+def _sse(event: str, data: str, event_id: int | None = None) -> str:
+    """Format one Server-Sent Events message: optional id, event name, data, blank line."""
+    head = f"id: {event_id}\n" if event_id is not None else ""
+    return f"{head}event: {event}\ndata: {data}\n\n"
+
+
+async def event_stream(manager: RunManager, run_id: str, after: int) -> AsyncIterator[str]:
+    """Yield SSE messages: every stage event with index > after, then "end".
+
+    Order matters on every loop: read the status FIRST, the events SECOND. If
+    the status already says the run is over, the events read a moment later
+    are complete (the background thread writes each event before it frees the
+    run slot), so no final stage can be missed between the two reads.
+
+    Args:
+        manager: The app's RunManager.
+        run_id: An existing run.
+        after: Index of the last event the client already has (-1 for none);
+            from the Last-Event-ID header when the browser reconnects.
+    """
+    sent, last_message = after, time.monotonic()
+    while True:
+        status = manager.status(run_id)
+        for event in manager.events(run_id):
+            if event.index > sent:
+                yield _sse("stage", event.model_dump_json(), event.index)
+                sent, last_message = event.index, time.monotonic()
+        if status != "running":
+            yield _sse("end", json.dumps({"status": status}))
+            return
+        if time.monotonic() - last_message >= SSE_KEEPALIVE_S:
+            yield ": keep-alive\n\n"  # a comment line: browsers ignore it, connections stay open
+            last_message = time.monotonic()
+        await asyncio.sleep(SSE_POLL_INTERVAL_S)  # wait without holding a worker thread
 
 
 def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
@@ -111,5 +159,26 @@ def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
         if summary is None:
             raise HTTPException(404, f"No run called {run_id!r}.")
         return summary
+
+    @app.get("/api/runs/{run_id}/events")
+    async def run_events(
+        run_id: str,
+        last_event_id: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """Live stage events (Server-Sent Events): replay what happened, then push new ones.
+
+        Browsers' EventSource sends Last-Event-ID when it reconnects; streaming
+        then resumes after that event instead of starting over.
+        """
+        if manager.status(run_id) is None:
+            raise HTTPException(404, f"No run called {run_id!r}.")
+        after = int(last_event_id) if last_event_id and last_event_id.isdigit() else -1
+        return StreamingResponse(
+            event_stream(manager, run_id, after),
+            media_type="text/event-stream",
+            # no-cache: never serve a stale copy; X-Accel-Buffering: tell proxies
+            # such as nginx to pass each message on at once instead of batching.
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     return app

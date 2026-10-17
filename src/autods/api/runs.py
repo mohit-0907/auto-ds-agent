@@ -195,6 +195,23 @@ class RunManager:
             return "finished"
         return "interrupted"  # started but never finished, e.g. the server was stopped
 
+    def status(self, run_id: str) -> RunStatus | None:
+        """Just the status of one run (cheap; polled by the live-events stream)."""
+        run_dir = self.run_dir(run_id)
+        return None if run_dir is None else self._status(run_dir)
+
+    def events(self, run_id: str) -> list[StageEvent]:
+        """The stage events so far: from memory while running, else from events.jsonl.
+
+        _execute writes and flushes each event to the file *before* adding it to
+        memory, so the file always holds at least what memory holds.
+        """
+        with self._lock:
+            if self._active is not None and self._active.run_id == run_id:
+                return list(self._active.events)
+        run_dir = self.run_dir(run_id)
+        return [] if run_dir is None else _read_events(run_dir / "events.jsonl")
+
     def summary(self, run_id: str) -> RunSummary | None:
         """Everything known about one run, or None if there is no such run."""
         run_dir = self.run_dir(run_id)
@@ -204,13 +221,7 @@ class RunManager:
         record = _read_json(run_dir / "run.json") or {}
         inputs = record.get("inputs", {})
         status = self._status(run_dir)
-
-        with self._lock:
-            live = (
-                list(self._active.events)
-                if self._active is not None and self._active.run_id == run_id
-                else None
-            )
+        events = self.events(run_id)  # after the status, for the reason in event_stream
         report = run_dir / "report.md"
         error = run_dir / "error.txt"
         decision = record.get("task_decision") or {}
@@ -221,7 +232,7 @@ class RunManager:
             description=request.get("description") or inputs.get("user_description", ""),
             target_column=request.get("target_column", inputs.get("target_column")),
             created_at=request.get("created_at"),
-            events=live if live is not None else _read_events(run_dir / "events.jsonl"),
+            events=events,
             task_type=decision.get("task_type"),
             best_model_id=record.get("best_model_id"),
             leaderboard=[ModelResult.model_validate(r) for r in record.get("leaderboard", [])],

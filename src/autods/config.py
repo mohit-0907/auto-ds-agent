@@ -110,6 +110,15 @@ LEAKAGE_CORRELATION_THRESHOLD = 0.99  # A new column this correlated with the ta
 # encoding of a high-cardinality column exploding the frame.
 MAX_FE_COLUMNS = 500
 
+# --- Web API ---------------------------------------------------------------
+
+# How often an open live-events stream checks for new stage events. Stages take
+# seconds, so a quarter-second delay is invisible.
+SSE_POLL_INTERVAL_S = 0.25
+# A comment line sent on a quiet stream, so proxies and browsers do not drop
+# a connection that waits a long time (the arena can be quiet for a while).
+SSE_KEEPALIVE_S = 15.0
+
 # --- Profiler --------------------------------------------------------------
 
 MAX_DATASET_MB = 200  # Checked against file size on disk, before loading.
