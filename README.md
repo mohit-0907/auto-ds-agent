@@ -10,7 +10,7 @@ task routing, feature-engineering codegen, and the final report.
 
 Status: **Phase 6 of 8 — one command takes a CSV to a written, number-verified report**
 (profiling, task routing, self-repairing feature engineering, fallback, cross-validated
-model arena, report, saved model). A Streamlit UI (Phase 7) is next.
+model arena, report, saved model). A web app (FastAPI + React, Phase 7) is next.
 
 See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
 

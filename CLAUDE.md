@@ -2,7 +2,7 @@
 
 ## Project
 
-**auto-ds-agent** — a LangGraph agent that takes a tabular dataset plus a natural-language description, infers the ML task type, generates and self-repairs feature engineering code in a sandbox, benchmarks candidate models, and recommends the best pipeline with a written justification.
+**auto-ds-agent** — a LangGraph agent that takes a tabular dataset plus a natural-language description, infers the ML task type, generates and self-repairs feature engineering code in a sandbox, benchmarks candidate models, and recommends the best pipeline with a written justification. Used through a CLI (`autods run`) and a web app: a FastAPI backend that streams the agent live to a React + TypeScript frontend.
 
 Full phase breakdown and definitions of done: `PROJECT_PLAN.md`. Read it before answering architecture questions.
 
@@ -15,7 +15,7 @@ Full phase breakdown and definitions of done: `PROJECT_PLAN.md`. Read it before 
 ### The loop for every task
 
 1. **Plan (short).** State the goal, the files you'll touch, and the design decisions involved. When a decision is genuinely mine — it changes behaviour, scope, the state contract, or adds a dependency — **ask before coding**: give 2–3 options, the trade-off of each, and your recommendation. Don't ask about things with an obvious conventional default; pick it and say so.
-2. **Build.** Write the implementation *and* the tests. Run `uv run pytest` and `uv run ruff check src/ tests/` and `uv run ruff format --check src/ tests/` before reporting. Never report a task done with failing tests.
+2. **Build.** Write the implementation *and* the tests. Run `uv run pytest` and `uv run ruff check src/ tests/` and `uv run ruff format --check src/ tests/` before reporting; for any task touching `web/`, also `npm run lint`, `npm run test` and `npm run build` in `web/`. Never report a task done with failing tests.
 3. **Explain.** After the code is green:
    - What changed, file by file, in a few bullets
    - A walkthrough of the non-obvious parts — the *why*, not a narration of syntax
@@ -23,6 +23,13 @@ Full phase breakdown and definitions of done: `PROJECT_PLAN.md`. Read it before 
    - Anything you got wrong along the way and how a test caught it (these make good interview stories)
 4. **Check understanding.** End with **one question** about the code that an interviewer might ask. I'll answer; correct me plainly if I'm wrong or only half right.
 5. **Stop.** Wait for me before starting the next task.
+
+### Frontend tasks: I am new to React
+
+I don't know React yet. For every task that touches `web/`:
+- Explain each React/TypeScript concept the first time it appears (component, props, state, hooks, effects, types), in plain words with a small example.
+- Trace the request flow end to end: which click sends which HTTP request, which FastAPI route handles it, what it calls in the agent, and what comes back and gets rendered.
+- Keep the frontend simple and conventional; prefer readable code I can explain over clever code.
 
 ### Still true
 
@@ -59,6 +66,7 @@ Flag any violation, even if I introduced it.
 6. **Every failure path degrades.** A node that fails routes to a fallback; the run does not crash.
 7. **Prompts live in files** under `src/autods/prompts/`, never as inline string literals.
 8. **Determinism where possible.** Fixed `random_state` everywhere; the arena must be reproducible.
+9. **The web layer is a thin caller.** FastAPI routes start and read runs of the graph, like the CLI; no agent logic in routes. The browser never calls an LLM and never computes a metric — it only displays state and run artifacts.
 
 ---
 
@@ -71,6 +79,7 @@ Flag any violation, even if I introduced it.
 - Logging via `structlog`, never `print()` outside `cli.py`
 - Google-style docstrings on public functions
 - Small commits, one per task, imperative messages
+- Frontend (`web/`): React + TypeScript (strict), built with Vite; `npm run lint`, `npm run test` (Vitest + React Testing Library), `npm run build` must pass
 
 ---
 
@@ -82,7 +91,9 @@ uv run pytest                             # tests
 uv run pytest tests/eval_router.py -s     # router eval
 uv run ruff check src/ --fix              # lint
 uv run autods run datasets/Titanic-Dataset.csv --description "..." --target Survived
-uv run streamlit run app/streamlit_app.py
+uv run autods serve                       # web app: API + built frontend (Phase 7)
+cd web && npm install && npm run dev     # frontend dev server, proxies /api to FastAPI
+cd web && npm run lint && npm run test && npm run build
 ```
 
 Datasets on disk: `datasets/Titanic-Dataset.csv`, `datasets/ames_train.csv`.
@@ -91,7 +102,7 @@ Datasets on disk: `datasets/Titanic-Dataset.csv`, `datasets/ames_train.csv`.
 
 ## Current status
 
-**Phase:** 7 — Streamlit UI. Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 ✅ · Phase 6 ✅
+**Phase:** 7 — Web app (FastAPI + React; changed from Streamlit on 2026-10-17, see PROJECT_PLAN Phase 7). Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 ✅ · Phase 6 ✅
 **Phase 2 result:** router eval 10/10 (raw and post-sanity-check), 10/10 stable over 3 runs, $0.0049/call on `openai:gpt-6.1-sol` (`runs/eval_router_20261005_003942.json`); `openai:gpt-6-luna` also 10/10 stable at $0.0003/call (`runs/eval_router_20261005_004809.json`) → router now on Luna, codegen/reporter on Sol. Caveat for README: descriptions are explicit and the sanity check never fired in the eval; its value is shown by unit tests. Candidate Phase 8 additions: a harder eval set (vague/missing descriptions, ambiguous targets); fallback FE adds an `<col>_is_missing` indicator when it drops a column that has blanks (Titanic: survival 67% with Cabin vs 30% without); log-transform skewed regression targets (Ames: ridge extrapolated a 5,642 sq ft house to $867k vs actual $160k, and predicted one negative price).
 **Phase 3 done:** 3.1 contract (`sandbox/contract.py`: `prepare_target` converts text-number targets before FE; `validate_output` enforces exact row count, target unchanged, numeric/NaN/inf-free features, ≤ `MAX_FE_COLUMNS`, leakage — new leaky column = error, original = warning). Branch: `phase-3-sandbox`. · 3.2 executor (`sandbox/executor.py` + `_runner.py`: AST static check with import allowlist and blocked builtins, subprocess with stripped env (no API keys) + timeout + POSIX memory cap, 1000-row seeded sample then full run, parent-side validation, structured `ExecutionResult`)
 · 3.3 FE codegen (`nodes/fe_codegen.py`, `FECode{explanation, code}`, prompts `fe_system/fe_user/fe_retry.md`, retry = latest attempt in full + one-line summaries of earlier ones; shared `llm.invoke_structured` now used by router too; new state key `fe_explanations`). Live: Titanic failed attempt 1 (pandas 3 read-only array) and self-repaired on attempt 2; Ames (296 features, truncated profile) and penguins passed first try; ~$0.016–0.040 per codegen run.
@@ -107,7 +118,7 @@ Datasets on disk: `datasets/Titanic-Dataset.csv`, `datasets/ames_train.csv`.
 · 6.2 artifacts (`nodes/artifacts.py`, not yet wired): `artifacts_node` refits the winner on all rows → `best_pipeline.joblib` = plain dict {format_version, model, feature_columns, class_names, target, task_type, trained_rows, fe_source, …} + `fe_code.py` (generated code with header, or a note for the fallback); `finalize_node` writes `run.json` (inputs, config, decision, FE attempts, leaderboard, warnings, cost, artifact list; no secrets). `joblib` declared. README "Known limitations" added (sandbox isolation ≠ security, batch-stateless FE, joblib trust, LLM FE varies).
 · 6.3 CLI + wiring (`cli.py`, typer 0.27.3 + rich added, `[project.scripts] autods`): `autods run DATA -d "..." [-t col] [--runs-dir] [-v]`, live progress via `graph.stream`, logs hidden unless `-v`; exit codes 0 model / 1 crash / 2 usage / 3 no model. Graph: arena → artifacts → reporter → finalize → END; early exits now route "report" → reporter. `RECURSION_LIMIT = 2·MAX_FE_ATTEMPTS + 10`. Live Titanic via the real CLI: all stages ✓, hgb ROC-AUC 0.881, narrative passed the number check first try, $0.0255. Fix from reading that report: prediction-cost fact now compares against the fastest *real* model, not the dummy.
 · 6.4 Phase 6 DoD: unseen `datasets/mpg.csv` (seaborn, never used in code/prompts/tests), `uv run autods run datasets/mpg.csv -d "Predict a car's fuel efficiency in miles per gallon"`, no `--target`: router → mpg (0.99), FE first attempt, hgb chosen over higher-mean rf (3/5 folds), narrative verified, $0.023, exit 0. Showcase copied to `docs/example_run/` (report.md, leaderboard.csv, fe_code.py — run.json excluded, it holds local paths) and linked from README. Stress test `datasets/taxis.csv` (predict tip): Sol dropped `total` itself as target leakage, rf R² 0.72, $0.025; data artifact the agent can't see: cash trips always tip $0 (recorded tips only). Fix from reading the mpg report: tie notes/facts said "higher/highest mean" for RMSE → now "better/best mean … lower is better".
-**Next task:** 7.1 — Phase 7: Streamlit UI (upload → description → live stage progress via graph.stream → leaderboard → report → downloads)
+**Next task:** 7.1 — API skeleton: FastAPI app, upload + start a run in a background thread, run status + run list, shared progress module (move `describe` out of `cli.py`), API tests with the scripted LLM. Node v24.19.0 / npm 11.17.0 installed. Branch `phase-7-ui`.
 
 <!-- Update these lines at the end of every session. Ask me to. -->
 
