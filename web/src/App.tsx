@@ -1,41 +1,43 @@
-// The top-level component: page frame plus whichever view is current.
-// Task 7.4 replaces the "run started" card with the live run view.
+// The top-level component: the page frame, and which page each URL shows.
 
-import { useState } from 'react'
-import { NewRunForm } from './components/NewRunForm'
+import { Link, Route, Routes } from 'react-router'
+import { NewRunPage } from './pages/NewRunPage'
+import { RunPage } from './pages/RunPage'
 
 export default function App() {
-  const [runId, setRunId] = useState<string | null>(null)
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-3xl px-6 py-4">
-          <h1 className="text-lg font-semibold">auto-ds-agent</h1>
-          <p className="text-sm text-slate-500">
-            Upload a dataset and describe your goal. The agent picks the task, writes and repairs
-            feature engineering code, benchmarks models, and writes a report.
-          </p>
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+          <div>
+            <Link to="/" className="text-lg font-semibold hover:text-indigo-700">
+              auto-ds-agent
+            </Link>
+            <p className="text-sm text-slate-500">
+              Describe your goal; the agent writes, repairs and benchmarks the rest.
+            </p>
+          </div>
+          <Link to="/" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+            New run
+          </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          {runId ? (
-            <div className="space-y-3">
-              <p className="font-medium">Run started</p>
-              <p className="font-mono text-sm text-slate-600">{runId}</p>
-              <button
-                onClick={() => setRunId(null)}
-                className="text-sm text-indigo-600 hover:underline"
-              >
-                Start another run
-              </button>
-            </div>
-          ) : (
-            <NewRunForm onStarted={setRunId} />
-          )}
-        </section>
+        {/* Routes picks the first Route whose path matches the current URL. */}
+        <Routes>
+          <Route path="/" element={<NewRunPage />} />
+          <Route path="/runs/:runId" element={<RunPage />} />
+          <Route
+            path="*"
+            element={
+              <p>
+                Page not found.{' '}
+                <Link to="/" className="text-indigo-600 hover:underline">Start a new run</Link>
+              </p>
+            }
+          />
+        </Routes>
       </main>
     </div>
   )
