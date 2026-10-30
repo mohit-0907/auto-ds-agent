@@ -28,6 +28,7 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     warnings: [],
     error: null,
     files: [],
+    downloads: [],
     ...overrides,
   }
 }
@@ -36,6 +37,8 @@ const FINISHED = summary({
   status: 'finished',
   best_model_id: 'hgb',
   token_cost_usd: 0.0255,
+  report_markdown: '# Run report: Titanic\n\nHist Gradient Boosting is recommended.',
+  downloads: ['report.md', 'best_pipeline.joblib'],
   leaderboard: [
     {
       model_id: 'hgb',
@@ -110,6 +113,17 @@ describe('RunPage', () => {
     expect(result).toHaveTextContent('Recommended model: Hist Gradient Boosting · ROC-AUC 0.882')
     expect(result).toHaveTextContent('LLM cost $0.0255')
     expect(screen.queryByText('Working…')).not.toBeInTheDocument()
+
+    // ...followed by the full results.
+    const leaderboard = screen.getByRole('region', { name: 'Leaderboard' })
+    expect(within(leaderboard).getByText('chosen')).toBeInTheDocument()
+    const downloads = screen.getByRole('region', { name: 'Downloads' })
+    expect(within(downloads).getByRole('link', { name: /best_pipeline\.joblib/ })).toHaveAttribute(
+      'href',
+      `/api/runs/${RUN_ID}/files/best_pipeline.joblib`,
+    )
+    const report = screen.getByRole('region', { name: 'Report' })
+    expect(within(report).getByRole('heading', { name: 'Run report: Titanic' })).toBeInTheDocument()
   })
 
   it('says so when the run does not exist', async () => {

@@ -51,6 +51,7 @@ export interface RunSummary {
   warnings: string[]
   error: string | null
   files: string[]
+  downloads: string[] // the files the server will serve via /files/{name}
 }
 
 /** One row of GET /api/runs. */

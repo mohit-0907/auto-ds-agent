@@ -1,6 +1,7 @@
 // The top-level component: the page frame, and which page each URL shows.
 
 import { Link, Route, Routes } from 'react-router'
+import { HistoryPage } from './pages/HistoryPage'
 import { NewRunPage } from './pages/NewRunPage'
 import { RunPage } from './pages/RunPage'
 
@@ -17,9 +18,14 @@ export default function App() {
               Describe your goal; the agent writes, repairs and benchmarks the rest.
             </p>
           </div>
-          <Link to="/" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
-            New run
-          </Link>
+          <nav className="flex gap-2">
+            <Link to="/runs" className="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+              History
+            </Link>
+            <Link to="/" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+              New run
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -27,6 +33,7 @@ export default function App() {
         {/* Routes picks the first Route whose path matches the current URL. */}
         <Routes>
           <Route path="/" element={<NewRunPage />} />
+          <Route path="/runs" element={<HistoryPage />} />
           <Route path="/runs/:runId" element={<RunPage />} />
           <Route
             path="*"

@@ -4,6 +4,7 @@
     GET  /api/runs            run history, newest first
     GET  /api/runs/{run_id}   one run: status, stage events, and results once finished
     GET  /api/runs/{run_id}/events   live stage events as Server-Sent Events
+    GET  /api/runs/{run_id}/files/{name}   download one run artifact (allowlisted names)
     GET  /api/health          liveness check
 
 Interactive documentation is generated automatically at /docs.
@@ -21,10 +22,16 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from autods.api.runs import RunConflictError, RunListItem, RunManager, RunSummary
+from autods.api.runs import (
+    DOWNLOADABLE,
+    RunConflictError,
+    RunListItem,
+    RunManager,
+    RunSummary,
+)
 from autods.config import (
     MAX_DATASET_MB,
     RUNS_DIR,
@@ -179,6 +186,21 @@ def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
             # no-cache: never serve a stale copy; X-Accel-Buffering: tell proxies
             # such as nginx to pass each message on at once instead of batching.
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/api/runs/{run_id}/files/{name}")
+    def download_file(run_id: str, name: str) -> FileResponse:
+        """Download one of a run's artifacts. Only names on the DOWNLOADABLE allowlist."""
+        run_dir = manager.run_dir(run_id)  # validates the run ID (no path traversal)
+        if run_dir is None or name not in DOWNLOADABLE or not (run_dir / name).is_file():
+            raise HTTPException(404, f"No file {name!r} for run {run_id!r}.")
+        return FileResponse(
+            run_dir / name,
+            media_type=DOWNLOADABLE[name],
+            # "attachment": save to disk rather than display. The run ID in the saved
+            # name keeps downloads from different runs apart in the Downloads folder.
+            filename=f"{run_id}_{name}",
+            content_disposition_type="attachment",
         )
 
     return app

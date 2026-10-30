@@ -1,8 +1,12 @@
 // URL "/runs/:runId": one run, live while it runs, with a result card once it ends.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, getRun } from '../api'
+import { Downloads } from '../components/Downloads'
+import { Leaderboard } from '../components/Leaderboard'
+import { ReportView } from '../components/ReportView'
+import { StatusPill } from '../components/StatusPill'
 import { Timeline } from '../components/Timeline'
 import { useRunEvents } from '../hooks/useRunEvents'
 import { METRIC_LABELS, formatMetric } from '../stages'
@@ -13,13 +17,6 @@ export function RunPage() {
   // key={runId}: moving to a different run gives a brand-new RunView with fresh state,
   // instead of the old run's events lingering while the new ones arrive.
   return <RunView key={runId} runId={runId} />
-}
-
-const STATUS_STYLES: Record<RunStatus, string> = {
-  running: 'bg-indigo-100 text-indigo-700',
-  finished: 'bg-emerald-100 text-emerald-700',
-  failed: 'bg-red-100 text-red-700',
-  interrupted: 'bg-amber-100 text-amber-800',
 }
 
 function RunView({ runId }: { runId: string }) {
@@ -70,9 +67,7 @@ function RunView({ runId }: { runId: string }) {
             <h2 className="truncate text-base font-semibold">{summary?.dataset ?? runId}</h2>
             {summary && <p className="mt-0.5 text-sm text-slate-500">“{summary.description}”</p>}
           </div>
-          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
-            {status}
-          </span>
+          <StatusPill status={status} />
         </div>
         <Timeline events={events} live={!ended && stream !== 'error'} />
         {stream === 'error' && (
@@ -82,7 +77,24 @@ function RunView({ runId }: { runId: string }) {
         )}
       </section>
 
-      {ended && summary && summary.status !== 'running' && <ResultCard summary={summary} />}
+      {ended && summary && summary.status !== 'running' && (
+        <>
+          <ResultCard summary={summary} />
+          {summary.leaderboard.length > 0 && (
+            <Card title="Leaderboard">
+              <Leaderboard leaderboard={summary.leaderboard} bestModelId={summary.best_model_id} />
+            </Card>
+          )}
+          <Card title="Downloads">
+            <Downloads runId={runId} files={summary.downloads} />
+          </Card>
+          {summary.report_markdown && (
+            <Card title="Report">
+              <ReportView markdown={summary.report_markdown} />
+            </Card>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -105,8 +117,18 @@ function ResultCard({ summary }: { summary: RunSummary }) {
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Result">
       <p className="font-medium">{headline}</p>
       <p className="mt-1 text-sm text-slate-500">
-        LLM cost ${summary.token_cost_usd.toFixed(4)} · the full leaderboard and report come next
+        LLM cost ${summary.token_cost_usd.toFixed(4)}
       </p>
+    </section>
+  )
+}
+
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  // `children` is whatever is written between <Card> and </Card>.
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-label={title}>
+      <h3 className="mb-4 text-base font-semibold">{title}</h3>
+      {children}
     </section>
   )
 }

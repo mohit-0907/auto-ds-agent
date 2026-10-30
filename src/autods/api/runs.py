@@ -40,6 +40,18 @@ RunStatus = Literal["running", "finished", "failed", "interrupted"]
 _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
+# The only run files that can be downloaded, with their content types. An allowlist
+# fails closed: request.json, events.jsonl, the uploaded input and anything outside the
+# run folder simply are not on it -- no need to recognise every dangerous name.
+DOWNLOADABLE: dict[str, str] = {
+    "report.md": "text/markdown; charset=utf-8",
+    "leaderboard.csv": "text/csv; charset=utf-8",
+    "fe_code.py": "text/x-python; charset=utf-8",
+    "best_pipeline.joblib": "application/octet-stream",
+    "run.json": "application/json",
+}
+
+
 class RunConflictError(Exception):
     """A run is already in progress; v1 runs one at a time."""
 
@@ -73,6 +85,7 @@ class RunSummary(BaseModel):
     warnings: list[str]
     error: str | None
     files: list[str]
+    downloads: list[str]  # the files in `files` that GET .../files/{name} will serve
 
 
 @dataclass
@@ -241,6 +254,7 @@ class RunManager:
             warnings=record.get("warnings", []),
             error=error.read_text(encoding="utf-8") if error.exists() else None,
             files=sorted(p.name for p in run_dir.iterdir() if p.is_file()),
+            downloads=[name for name in DOWNLOADABLE if (run_dir / name).is_file()],
         )
 
     def list_runs(self) -> list[RunListItem]:

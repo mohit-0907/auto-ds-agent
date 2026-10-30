@@ -54,6 +54,11 @@ export function listRuns(): Promise<RunListItem[]> {
   return request<RunListItem[]>('/api/runs')
 }
 
+/** The download URL for one of a run's artifacts (an <a href> target, not fetched by code). */
+export function fileUrl(runId: string, name: string): string {
+  return `/api/runs/${encodeURIComponent(runId)}/files/${encodeURIComponent(name)}`
+}
+
 /** The live-events URL for one run, for the browser's EventSource (Task 7.4). */
 export function eventsUrl(runId: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/events`
