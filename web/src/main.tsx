@@ -3,6 +3,15 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
+// Bundled fonts: the files ship inside the build, so the app works offline and never
+// contacts Google Fonts. Only the weights the design uses.
+import '@fontsource/caprasimo/400.css'
+import '@fontsource/figtree/400.css'
+import '@fontsource/figtree/500.css'
+import '@fontsource/figtree/600.css'
+import '@fontsource/figtree/700.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
 import './index.css'
 import App from './App.tsx'
 

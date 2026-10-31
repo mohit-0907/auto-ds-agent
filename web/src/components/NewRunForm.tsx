@@ -1,30 +1,83 @@
-// The "start a new run" form: pick or drop a dataset, describe the goal, press Start.
+// The "start a new run" form: drop or pick a dataset (or choose a sample), describe the
+// goal, optionally name the target, press Start.
 
-import { useState, type DragEvent, type FormEvent } from 'react'
-import { ApiError, checkFile, startRun } from '../api'
+import { ArrowRight, File as FileIcon, TriangleAlert, Upload, X } from 'lucide-react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type MouseEvent,
+} from 'react'
+import { ApiError, checkFile, listSamples, startRun } from '../api'
+import type { SampleDataset } from '../types'
 
 interface Props {
-  /** Called with the new run's ID once the server has accepted the upload. */
+  /** Called with the new run's ID once the server has accepted it. */
   onStarted: (runId: string) => void
 }
 
+/** What the run will start from: a file the user picked, or a server sample. */
+type Source = { file: File } | { sample: SampleDataset } | null
+
+function formatSize(bytes: number): string {
+  if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+const KICKER = 'text-[11px] font-semibold tracking-[0.08em] uppercase text-muted'
+const FIELD =
+  'w-full border border-divider bg-page text-ink caret-accent placeholder:text-faint focus:border-accent focus:outline-none'
+
 export function NewRunForm({ onStarted }: Props) {
-  // State: the component's memory. Changing any of these makes React redraw the form.
-  const [file, setFile] = useState<File | null>(null)
+  // State: the form's memory. Changing any of these makes React redraw the form.
+  const [source, setSource] = useState<Source>(null)
   const [description, setDescription] = useState('')
   const [target, setTarget] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [samples, setSamples] = useState<SampleDataset[]>([])
+  const fileInput = useRef<HTMLInputElement>(null) // a handle on the hidden <input type=file>
 
-  // Not state: computed fresh on every redraw from the state above.
-  const canSubmit = file !== null && description.trim() !== '' && !submitting
+  // Fetch the sample list once. If it fails, the samples row simply doesn't appear.
+  useEffect(() => {
+    let cancelled = false
+    listSamples()
+      .then((list) => {
+        if (!cancelled && Array.isArray(list)) setSamples(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Derived, not stored (see Task 7.3): recomputed on every redraw.
+  const canSubmit = source !== null && description.trim() !== '' && !submitting
 
   function chooseFile(candidate: File | undefined) {
     if (!candidate) return
     const problem = checkFile(candidate) // checked here for an instant answer...
     setError(problem)
-    setFile(problem ? null : candidate)
+    setSource(problem ? null : { file: candidate })
+  }
+
+  function chooseSample(sample: SampleDataset) {
+    setSource({ sample })
+    setDescription(sample.description)
+    setTarget(sample.target)
+    setError(null)
+  }
+
+  function clear(event: MouseEvent) {
+    // The X sits inside the drop zone's <label>: without this, clicking it would also
+    // open the file picker.
+    event.preventDefault()
+    event.stopPropagation()
+    setSource(null)
+    if (fileInput.current) fileInput.current.value = '' // so the same file can be re-picked
   }
 
   function onDrop(event: DragEvent<HTMLLabelElement>) {
@@ -35,11 +88,15 @@ export function NewRunForm({ onStarted }: Props) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault() // stop the browser's default "reload the page" on submit
-    if (!file) return
+    if (!source) return
     setSubmitting(true)
     setError(null)
     try {
-      const created = await startRun(file, description.trim(), target.trim() || undefined)
+      const created = await startRun(
+        'file' in source ? { file: source.file } : { sample: source.sample.name },
+        description.trim(),
+        target.trim() || undefined,
+      )
       onStarted(created.run_id)
     } catch (err) {
       // ...and again on the server, which has the final word (400, 409, 413).
@@ -49,81 +106,139 @@ export function NewRunForm({ onStarted }: Props) {
     }
   }
 
+  let title = 'Drop a CSV or Parquet file here'
+  let subline = 'or click to choose one · .csv, .parquet · up to 200 MB'
+  if (source && 'file' in source) {
+    title = source.file.name
+    subline = `${formatSize(source.file.size)} · click or drop to replace`
+  } else if (source) {
+    title = source.sample.name
+    subline = `${source.sample.rows.toLocaleString('en-US')} rows · sample dataset · click or drop to replace`
+  }
+
+  const zone = dragging
+    ? 'border-accent bg-accent-bg'
+    : source
+      ? 'border-ok-dot bg-ok-bg/45'
+      : 'border-divider bg-page'
+  const icon = source ? 'bg-ok-bg text-ok-fg' : 'bg-accent-bg text-accent-fg'
+
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <label
-        onDragOver={(event) => {
-          event.preventDefault() // required, or the browser refuses the drop
-          setDragging(true)
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
-          dragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-slate-400'
-        }`}
+    <div>
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-[22px] rounded-[32px] bg-card p-7 shadow-card"
       >
-        <input
-          type="file"
-          accept=".csv,.parquet,.pq"
-          className="sr-only"
-          aria-label="Dataset file"
-          onChange={(event) => chooseFile(event.target.files?.[0])}
-        />
-        {file ? (
-          <>
-            <span className="font-medium text-slate-900">{file.name}</span>
-            <span className="mt-1 text-sm text-slate-500">
-              {(file.size / 1024).toFixed(0)} KB · click or drop to replace
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="font-medium text-slate-900">Drop a CSV or Parquet file here</span>
-            <span className="mt-1 text-sm text-slate-500">or click to choose one · up to 200 MB</span>
-          </>
+        <label
+          onDragOver={(event) => {
+            event.preventDefault() // required, or the browser refuses the drop
+            setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          className={`flex cursor-pointer items-center gap-[18px] rounded-3xl border-[1.5px] border-dashed px-6 py-[26px] ${zone}`}
+        >
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".csv,.parquet,.pq"
+            className="sr-only"
+            aria-label="Dataset file"
+            onChange={(event) => chooseFile(event.target.files?.[0])}
+          />
+          <span className={`flex h-[52px] w-[52px] flex-none items-center justify-center rounded-full ${icon}`}>
+            {source ? (
+              <FileIcon size={22} strokeWidth={2.75} aria-hidden="true" />
+            ) : (
+              <Upload size={22} strokeWidth={2.75} aria-hidden="true" />
+            )}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[15px] font-semibold">{title}</span>
+            <span className="text-[13px] text-muted">{subline}</span>
+          </span>
+          {source && (
+            <button
+              type="button"
+              onClick={clear}
+              aria-label="Remove file"
+              className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-muted hover:bg-sel"
+            >
+              <X size={16} strokeWidth={2.75} aria-hidden="true" />
+            </button>
+          )}
+        </label>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="description" className="text-[13px] font-semibold">
+            What do you want to predict?
+          </label>
+          <textarea
+            id="description"
+            rows={3}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="e.g. Predict which passengers survived"
+            className={`${FIELD} resize-y rounded-[20px] px-4 py-3 text-sm`}
+          />
+          <span className="text-xs text-muted">
+            Plain language. The agent uses it to choose the task and the target.
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="target" className="text-[13px] font-semibold">
+            Target column <span className="font-normal text-muted">optional</span>
+          </label>
+          <input
+            id="target"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder="Leave empty and the agent will work it out"
+            className={`${FIELD} rounded-full px-4 py-2.5 font-mono text-[13px]`}
+          />
+        </div>
+
+        {error && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-2xl bg-bad-bg px-3.5 py-2.5 text-[13px] text-bad-fg">
+            <TriangleAlert size={16} strokeWidth={2.75} className="mt-0.5 flex-none" aria-hidden="true" />
+            {error}
+          </div>
         )}
-      </label>
 
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-slate-700">
-          What do you want to predict?
-        </label>
-        <textarea
-          id="description"
-          rows={2}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="e.g. Predict which passengers survived"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
-        />
-      </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-display text-[15px] text-on-accent enabled:hover:brightness-[0.93]"
+          >
+            {submitting ? 'Starting…' : 'Start run'}
+            <ArrowRight size={16} strokeWidth={2.75} aria-hidden="true" />
+          </button>
+          <span className="text-xs text-muted">One run at a time · usually about a minute</span>
+        </div>
+      </form>
 
-      <div>
-        <label htmlFor="target" className="block text-sm font-medium text-slate-700">
-          Target column <span className="font-normal text-slate-400">(optional)</span>
-        </label>
-        <input
-          id="target"
-          value={target}
-          onChange={(event) => setTarget(event.target.value)}
-          placeholder="Leave empty and the agent will work it out"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
-        />
-      </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+      {samples.length > 0 && (
+        <div className="mt-7 flex flex-col gap-2.5">
+          <span className={KICKER}>Or try a sample dataset</span>
+          <div className="flex flex-wrap gap-2">
+            {samples.map((sample) => (
+              <button
+                key={sample.name}
+                type="button"
+                onClick={() => chooseSample(sample)}
+                className="flex flex-col items-start gap-px rounded-[18px] border border-divider px-4 py-[9px] text-left hover:bg-sel"
+              >
+                <span className="text-[13px] font-semibold">{sample.name}</span>
+                <span className="text-[11.5px] text-muted">
+                  {sample.rows.toLocaleString('en-US')} rows · {sample.kind}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
-
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
-        {submitting ? 'Uploading…' : 'Start run'}
-      </button>
-    </form>
+    </div>
   )
 }

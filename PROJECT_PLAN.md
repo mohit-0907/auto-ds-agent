@@ -271,7 +271,7 @@ CLI: `autods run data.csv --description "..." --target price`
 
 ---
 
-### Phase 7 — Web app: FastAPI backend + React frontend · ~12h
+### Phase 7 — Web app: FastAPI backend + React frontend · ~22h (incl. redesign)
 *Changed from Streamlit on 2026-10-17: a full-stack app (agent + REST API + live streaming + React UI) is a stronger project than a Streamlit wrapper. Cost: ~4× the time, a second toolchain (Node), and a more involved Phase 8.*
 
 Upload → description → live stage progress → leaderboard → report → downloads, as a React app talking to a FastAPI backend.
@@ -302,9 +302,15 @@ Tasks:
 - **7.3** Frontend scaffold: Vite + React + TypeScript in `web/`, a typed API client, the new-run page (file drop, description, optional target).
 - **7.4** Live run view: consume the event stream; a stage timeline that shows retries.
 - **7.5** Results view: leaderboard table, rendered report, downloads, run history.
-- **7.6** Production serve + DoD: `autods serve` serves the built frontend; frontend tests for the key components; walkthrough.
 
-New dependencies: `fastapi`, `uvicorn`, `python-multipart` (Python); `react`, `react-dom`, `vite`, `typescript`, a Markdown renderer, `vitest` + `@testing-library/react` (Node). Styling is decided in 7.3.
+*Redesign added on 2026-10-30 from `docs/design_handoff_auto_ds_agent_ui/` (high-fidelity, "Organic" design system: app shell with a run sidebar, light/dark theme, pipeline graph, tabs). Decisions: lift and fold verdicts are computed by the server, not the browser (invariant 9); fonts are bundled via @fontsource; a real samples endpoint lets a run start without an upload.*
+- **7.6** Design foundation + app shell + New run: tokens (light/dark) mapped into Tailwind, bundled fonts, `lucide-react` icons, theme toggle, sidebar run list, top bar, status-tag mapping, restyled New run screen with the "What the agent does" aside and sample datasets (`GET /api/samples`, start a run from a sample).
+- **7.7** Run screen: header chips, pipeline graph (pure, tested graph-state function), tabs, Steps tab with expandable rows and attempt groups; backend: per-event `detail`.
+- **7.8** Results tab + failure states: recommendation card, "why this model" fold squares, artifacts with sizes, leaderboard with fold dots, warnings strip, no-model and fallback states; backend: `selection` + lift + file sizes in `RunSummary`.
+- **7.9** Report tab, Feature code tab, All runs page (search + status filter), narrow-screen sidebar drawer; backend: richer `RunListItem`.
+- **7.10** Production serve + DoD: `autods serve` serves the built frontend (SPA fallback); walkthrough on a never-seen CSV.
+
+New dependencies: `fastapi`, `uvicorn`, `python-multipart` (Python); `react`, `react-dom`, `react-router`, `vite`, `typescript`, Tailwind, `react-markdown` + `remark-gfm` + `@tailwindcss/typography`, `vitest` + `@testing-library/react` (Node); for the redesign `lucide-react` and `@fontsource/*`.
 
 The developer is new to React: frontend tasks explain each concept as it appears (components, props, state, hooks, effects) and trace every request from button click to the agent and back.
 

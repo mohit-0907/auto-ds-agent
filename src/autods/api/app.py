@@ -1,6 +1,7 @@
 """The FastAPI application: HTTP routes over RunManager. No agent logic here (invariant 9).
 
-    POST /api/runs            upload a dataset + description -> start a run (202)
+    GET  /api/samples         sample datasets that can start a run without an upload
+    POST /api/runs            upload a dataset (or name a sample) + description -> start a run
     GET  /api/runs            run history, newest first
     GET  /api/runs/{run_id}   one run: status, stage events, and results once finished
     GET  /api/runs/{run_id}/events   live stage events as Server-Sent Events
@@ -33,8 +34,10 @@ from autods.api.runs import (
     RunSummary,
 )
 from autods.config import (
+    DATASETS_DIR,
     MAX_DATASET_MB,
     RUNS_DIR,
+    SAMPLE_DATASETS,
     SSE_KEEPALIVE_S,
     SSE_POLL_INTERVAL_S,
     SUPPORTED_EXTENSIONS,
@@ -108,8 +111,41 @@ async def event_stream(manager: RunManager, run_id: str, after: int) -> AsyncIte
         await asyncio.sleep(SSE_POLL_INTERVAL_S)  # wait without holding a worker thread
 
 
-def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
-    """Build the app. A factory, so tests and `autods serve` can choose the runs folder."""
+class SampleDataset(BaseModel):
+    """One entry of GET /api/samples: enough to fill the new-run form."""
+
+    name: str  # file name, also what POST /api/runs takes as `sample`
+    rows: int
+    kind: str  # "binary", "multiclass" or "regression": a label for the chip
+    description: str
+    target: str  # "" means the agent infers it
+
+
+def _count_rows(path: Path) -> int:
+    with path.open("rb") as f:
+        return max(0, sum(1 for _ in f) - 1)  # minus the header line
+
+
+def _samples(datasets_dir: Path) -> list[SampleDataset]:
+    """The configured samples whose files exist (a missing file is simply not offered)."""
+    found = []
+    for s in SAMPLE_DATASETS:
+        path = datasets_dir / s["file"]
+        if path.is_file():
+            found.append(
+                SampleDataset(
+                    name=s["file"],
+                    rows=_count_rows(path),
+                    kind=s["kind"],
+                    description=s["description"],
+                    target=s["target"],
+                )
+            )
+    return found
+
+
+def create_app(runs_dir: Path = RUNS_DIR, datasets_dir: Path = DATASETS_DIR) -> FastAPI:
+    """Build the app. A factory, so tests and `autods serve` can choose the folders."""
     app = FastAPI(
         title="auto-ds-agent API",
         version="0.1.0",
@@ -122,19 +158,36 @@ def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/samples", response_model=list[SampleDataset])
+    def list_samples() -> list[SampleDataset]:
+        """Datasets that can be started with one click, for trying the app without a CSV."""
+        return _samples(datasets_dir)
+
     @app.post("/api/runs", status_code=202, response_model=RunCreated)
     def create_run(
-        file: Annotated[UploadFile, File(description="CSV or Parquet dataset.")],
         description: Annotated[str, Form(description="What you want to predict, in words.")],
+        file: Annotated[UploadFile | None, File(description="CSV or Parquet dataset.")] = None,
+        sample: Annotated[
+            str | None, Form(description="Name of a sample dataset, instead of a file.")
+        ] = None,
         target: Annotated[str | None, Form(description="Target column; inferred if empty.")] = None,
     ) -> RunCreated:
-        """Save the upload into a new run folder and start the agent in the background."""
+        """Save the upload (or copy the sample) into a new run folder and start the agent."""
         if not description.strip():
             raise HTTPException(400, "Describe what you want to predict.")
-        filename = _safe_filename(file.filename or "")
-        if Path(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
-            allowed = ", ".join(SUPPORTED_EXTENSIONS)
-            raise HTTPException(400, f"Unsupported file type; expected one of: {allowed}.")
+        if (file is None) == (sample is None):
+            raise HTTPException(400, "Send either a file or a sample name, not both or neither.")
+        if sample is not None:
+            # Allowlist: only names GET /api/samples lists, so a sample name can never
+            # point at an arbitrary path such as "../../.env".
+            if sample not in {s.name for s in _samples(datasets_dir)}:
+                raise HTTPException(400, f"Unknown sample {sample!r}.")
+            filename = sample
+        else:
+            filename = _safe_filename(file.filename or "")
+            if Path(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
+                allowed = ", ".join(SUPPORTED_EXTENSIONS)
+                raise HTTPException(400, f"Unsupported file type; expected one of: {allowed}.")
         if manager.busy:
             # Checked before creating anything, so a refused upload leaves no folder behind.
             raise HTTPException(409, "A run is already in progress; try again when it finishes.")
@@ -144,7 +197,10 @@ def create_app(runs_dir: Path = RUNS_DIR) -> FastAPI:
         dataset_path = run_dir / "input" / filename
         dataset_path.parent.mkdir()
         try:
-            _save_upload(file, dataset_path, MAX_DATASET_MB)
+            if file is not None:
+                _save_upload(file, dataset_path, MAX_DATASET_MB)
+            else:
+                shutil.copyfile(datasets_dir / filename, dataset_path)  # self-contained run
             run_id = manager.start(run_dir, dataset_path, description.strip(), target or None)
         except HTTPException:
             shutil.rmtree(run_dir, ignore_errors=True)

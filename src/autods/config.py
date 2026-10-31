@@ -112,6 +112,37 @@ MAX_FE_COLUMNS = 500
 
 # --- Web API ---------------------------------------------------------------
 
+DATASETS_DIR = PROJECT_ROOT / "datasets"
+# Datasets the web app offers as one-click samples, so someone without a CSV at hand can
+# try the agent. Only these names can be started as a sample (an allowlist, like
+# downloads). An empty target means the agent infers it -- shown on purpose for penguins.
+SAMPLE_DATASETS: tuple[dict[str, str], ...] = (
+    {
+        "file": "Titanic-Dataset.csv",
+        "kind": "binary",
+        "description": "Predict which passengers survived",
+        "target": "Survived",
+    },
+    {
+        "file": "penguins.csv",
+        "kind": "multiclass",
+        "description": "Classify the penguin species",
+        "target": "",
+    },
+    {
+        "file": "mpg.csv",
+        "kind": "regression",
+        "description": "Predict a car's fuel efficiency",
+        "target": "mpg",
+    },
+    {
+        "file": "ames_train.csv",
+        "kind": "regression",
+        "description": "Predict the house sale price",
+        "target": "SalePrice",
+    },
+)
+
 # How often an open live-events stream checks for new stage events. Stages take
 # seconds, so a quarter-second delay is invisible.
 SSE_POLL_INTERVAL_S = 0.25

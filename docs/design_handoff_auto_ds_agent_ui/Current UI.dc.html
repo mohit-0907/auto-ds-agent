@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>body{margin:0;background:#e5e7eb;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji";}a{color:#4f46e5;}a:hover{color:#4338ca;}@keyframes spin{to{transform:rotate(360deg)}}</style>
+</helmet>
+<section style="display:flex;flex-wrap:wrap;gap:40px;padding:40px;align-items:flex-start;">
+<div id="0a" style="width:1000px;">
+<div style="font:600 13px ui-monospace,monospace;color:#475569;margin-bottom:8px;">0a · Current — New run (/)</div>
+<div style="min-height:640px;background:#f8fafc;color:#0f172a;font-size:16px;line-height:1.5;">
+  <header style="border-bottom:1px solid #e2e8f0;background:#fff;">
+    <div style="max-width:768px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 24px;">
+      <div><div style="font-size:18px;font-weight:600;line-height:28px;">auto-ds-agent</div><p style="margin:0;font-size:14px;color:#64748b;">Describe your goal; the agent writes, repairs and benchmarks the rest.</p></div>
+      <span style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 12px;font-size:14px;">New run</span>
+    </div>
+  </header>
+  <main style="max-width:768px;margin:0 auto;padding:32px 24px;">
+    <section style="border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,.05);">
+      <h2 style="margin:0 0 20px;font-size:16px;font-weight:600;">Start a new run</h2>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #cbd5e1;border-radius:12px;padding:40px 24px;text-align:center;">
+          <span style="font-weight:500;">Drop a CSV or Parquet file here</span>
+          <span style="margin-top:4px;font-size:14px;color:#64748b;">or click to choose one · up to 200 MB</span>
+        </div>
+        <div><div style="font-size:14px;font-weight:500;color:#334155;">What do you want to predict?</div><div style="margin-top:4px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;height:48px;color:#94a3b8;">e.g. Predict which passengers survived</div></div>
+        <div><div style="font-size:14px;font-weight:500;color:#334155;">Target column <span style="font-weight:400;color:#94a3b8;">(optional)</span></div><div style="margin-top:4px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;color:#94a3b8;">Leave empty and the agent will work it out</div></div>
+        <div style="border-radius:8px;background:#cbd5e1;color:#fff;padding:10px 16px;text-align:center;font-weight:500;">Start run</div>
+      </div>
+    </section>
+  </main>
+</div>
+</div>
+<div id="0b" style="width:1000px;">
+<div style="font:600 13px ui-monospace,monospace;color:#475569;margin-bottom:8px;">0b · Current — Run page (/runs/:id)</div>
+<div style="min-height:640px;background:#f8fafc;color:#0f172a;font-size:16px;line-height:1.5;">
+  <header style="border-bottom:1px solid #e2e8f0;background:#fff;">
+    <div style="max-width:768px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 24px;">
+      <div><div style="font-size:18px;font-weight:600;line-height:28px;">auto-ds-agent</div><p style="margin:0;font-size:14px;color:#64748b;">Describe your goal; the agent writes, repairs and benchmarks the rest.</p></div>
+      <span style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 12px;font-size:14px;">New run</span>
+    </div>
+  </header>
+  <main style="max-width:768px;margin:0 auto;padding:32px 24px;display:flex;flex-direction:column;gap:24px;">
+    <section style="border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,.05);">
+      <div style="margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+        <div><h2 style="margin:0;font-size:16px;font-weight:600;">Titanic-Dataset.csv</h2><p style="margin:2px 0 0;font-size:14px;color:#64748b;">“Predict who survived”</p></div>
+        <span style="border-radius:999px;padding:2px 10px;font-size:12px;font-weight:500;background:#d1fae5;color:#047857;">finished</span>
+      </div>
+      <ol style="list-style:none;margin:0;padding:0;font-size:14px;">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="9">
+          <li style="display:flex;align-items:flex-start;gap:12px;padding:6px 0;">
+            <span style="margin-top:2px;width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:999px;font-size:12px;font-weight:700;color:#fff;background:#10b981;">✓</span>
+            <span style="width:144px;flex-shrink:0;font-weight:500;">{{ r.label }}</span>
+            <span style="flex:1;min-width:0;color:#475569;">{{ r.text }}</span>
+            <span style="flex-shrink:0;font:12px ui-monospace,monospace;color:#94a3b8;">{{ r.t }}</span>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+    <section style="border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,.05);">
+      <p style="margin:0;font-weight:500;">Recommended model: Hist Gradient Boosting · ROC-AUC 0.879</p>
+      <p style="margin:4px 0 0;font-size:14px;color:#64748b;">LLM cost $0.0412 · the full leaderboard and report come next</p>
+    </section>
+  </main>
+</div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const ev = [['Profile data','891 rows × 12 columns','00:00'],['Choose task','binary_classification → Survived (confidence 1.00)','00:13'],['Check decision','no changes','00:13'],['Write features','attempt 1 written','00:36'],['Run in sandbox','attempt 1 passed validation','00:38'],['Benchmark models','best: Hist Gradient Boosting (ROC-AUC 0.879)','00:45'],['Save model','saved','00:45'],['Write report','report.md written','01:00'],['Finish','run.json written','01:00']];
+    return { rows: ev.map(([label,text,t]) => ({label,text,t})) };
+  }
+}
+</script>
+</body>
+</html>

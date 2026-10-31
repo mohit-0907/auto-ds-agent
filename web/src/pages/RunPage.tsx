@@ -6,7 +6,7 @@ import { ApiError, getRun } from '../api'
 import { Downloads } from '../components/Downloads'
 import { Leaderboard } from '../components/Leaderboard'
 import { ReportView } from '../components/ReportView'
-import { StatusPill } from '../components/StatusPill'
+import { StatusTag } from '../components/StatusTag'
 import { Timeline } from '../components/Timeline'
 import { useRunEvents } from '../hooks/useRunEvents'
 import { METRIC_LABELS, formatMetric } from '../stages'
@@ -67,7 +67,7 @@ function RunView({ runId }: { runId: string }) {
             <h2 className="truncate text-base font-semibold">{summary?.dataset ?? runId}</h2>
             {summary && <p className="mt-0.5 text-sm text-slate-500">“{summary.description}”</p>}
           </div>
-          <StatusPill status={status} />
+          <StatusTag status={status} outcome={summary?.outcome ?? null} />
         </div>
         <Timeline events={events} live={!ended && stream !== 'error'} />
         {stream === 'error' && (

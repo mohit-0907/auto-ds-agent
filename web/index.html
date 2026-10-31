@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>auto-ds-agent</title>
+    <script>
+      // Apply the saved theme before the first paint, so dark-mode users never see a flash
+      // of the light theme while React loads. useTheme() takes over from here.
+      try {
+        var saved = localStorage.getItem('autods-theme')
+        var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.dataset.theme =
+          saved === 'light' || saved === 'dark' ? saved : dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

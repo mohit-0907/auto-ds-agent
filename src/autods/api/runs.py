@@ -33,6 +33,9 @@ from autods.state import ModelResult
 log = structlog.get_logger(__name__)
 
 RunStatus = Literal["running", "finished", "failed", "interrupted"]
+# How a finished run ended, so the UI can tell a clean win from a recovery or a stop:
+# a recommended model; a model trained on fallback features; or no model at all.
+RunOutcome = Literal["model", "fallback", "no_model"]
 
 # Run IDs are folder names. Starting with a letter or digit and using only these
 # characters rules out "..", "/" and "\" -- so a request for run "../../.env"
@@ -57,14 +60,21 @@ class RunConflictError(Exception):
 
 
 class RunListItem(BaseModel):
-    """One row of the run history."""
+    """One row of the run history and the sidebar. Every value is read from the run's files."""
 
     run_id: str
     status: RunStatus
+    outcome: RunOutcome | None
     dataset: str
+    description: str
+    target_column: str | None
     created_at: str | None
     task_type: str | None
     best_model_id: str | None
+    best_model_name: str | None
+    primary_metric: str | None
+    best_score: float | None  # the best model's mean primary metric, computed by the arena
+    last_event: StageEvent | None  # only while running: what the agent finished last
 
 
 class RunSummary(BaseModel):
@@ -72,6 +82,7 @@ class RunSummary(BaseModel):
 
     run_id: str
     status: RunStatus
+    outcome: RunOutcome | None  # None unless status is "finished"
     dataset: str
     description: str
     target_column: str | None
@@ -100,6 +111,17 @@ def _read_json(path: Path) -> dict | None:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+
+
+def _outcome(status: RunStatus, record: dict) -> RunOutcome | None:
+    """How a finished run ended, read from its run.json. None until it has finished."""
+    if status != "finished":
+        return None
+    if record.get("best_model_id") is None:
+        return "no_model"
+    if (record.get("feature_engineering") or {}).get("final_source") == "fallback":
+        return "fallback"
+    return "model"
 
 
 def _read_events(path: Path) -> list[StageEvent]:
@@ -241,6 +263,7 @@ class RunManager:
         return RunSummary(
             run_id=run_id,
             status=status,
+            outcome=_outcome(status, record),
             dataset=request.get("dataset") or Path(inputs.get("dataset_path", "")).name,
             description=request.get("description") or inputs.get("user_description", ""),
             target_column=request.get("target_column", inputs.get("target_column")),
@@ -268,15 +291,30 @@ class RunManager:
             ):
                 continue  # eval outputs and pre-Phase-6 folders have neither
             summary = self.summary(path.name)
-            if summary is not None:
-                items.append(
-                    RunListItem(
-                        run_id=summary.run_id,
-                        status=summary.status,
-                        dataset=summary.dataset,
-                        created_at=summary.created_at,
-                        task_type=summary.task_type,
-                        best_model_id=summary.best_model_id,
-                    )
+            if summary is None:
+                continue
+            best = next(
+                (r for r in summary.leaderboard if r.model_id == summary.best_model_id), None
+            )
+            items.append(
+                RunListItem(
+                    run_id=summary.run_id,
+                    status=summary.status,
+                    outcome=summary.outcome,
+                    dataset=summary.dataset,
+                    description=summary.description,
+                    target_column=summary.target_column,
+                    created_at=summary.created_at,
+                    task_type=summary.task_type,
+                    best_model_id=summary.best_model_id,
+                    best_model_name=best.model_name if best else None,
+                    primary_metric=best.primary_metric if best else None,
+                    best_score=best.metrics.get(best.primary_metric) if best else None,
+                    last_event=(
+                        summary.events[-1]
+                        if summary.status == "running" and summary.events
+                        else None
+                    ),
                 )
+            )
         return items

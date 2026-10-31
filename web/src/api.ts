@@ -1,7 +1,7 @@
 // The typed API client: every request the frontend makes goes through this file.
 // Components call these functions and never build URLs or parse responses themselves.
 
-import type { RunCreated, RunListItem, RunSummary } from './types'
+import type { RunCreated, RunListItem, RunSummary, SampleDataset } from './types'
 
 // Mirrors SUPPORTED_EXTENSIONS and MAX_DATASET_MB in src/autods/config.py. The browser
 // checks these for an instant answer; the server checks them again and has the final word.
@@ -35,10 +35,18 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-/** POST /api/runs: upload a dataset and start the agent. */
-export function startRun(file: File, description: string, target?: string): Promise<RunCreated> {
+/** What a run starts from: an uploaded file, or one of the server's sample datasets. */
+export type RunSource = { file: File } | { sample: string }
+
+/** POST /api/runs: upload a dataset (or name a sample) and start the agent. */
+export function startRun(
+  source: RunSource,
+  description: string,
+  target?: string,
+): Promise<RunCreated> {
   const form = new FormData() // the same "multipart form" format as curl -F
-  form.append('file', file)
+  if ('file' in source) form.append('file', source.file)
+  else form.append('sample', source.sample)
   form.append('description', description)
   if (target) form.append('target', target)
   return request<RunCreated>('/api/runs', { method: 'POST', body: form })
@@ -47,6 +55,11 @@ export function startRun(file: File, description: string, target?: string): Prom
 /** GET /api/runs/{id}: everything about one run. */
 export function getRun(runId: string): Promise<RunSummary> {
   return request<RunSummary>(`/api/runs/${encodeURIComponent(runId)}`)
+}
+
+/** GET /api/samples: datasets that can start a run without an upload. */
+export function listSamples(): Promise<SampleDataset[]> {
+  return request<SampleDataset[]>('/api/samples')
 }
 
 /** GET /api/runs: run history, newest first. */

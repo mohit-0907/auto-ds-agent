@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeEventSource } from '../test/fakeEventSource'
+import { fakeFetch } from '../test/fakeFetch'
 import type { RunSummary } from '../types'
 import { NewRunPage } from './NewRunPage'
 import { RunPage } from './RunPage'
@@ -29,12 +30,14 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     error: null,
     files: [],
     downloads: [],
+    outcome: null,
     ...overrides,
   }
 }
 
 const FINISHED = summary({
   status: 'finished',
+  outcome: 'model',
   best_model_id: 'hgb',
   token_cost_usd: 0.0255,
   report_markdown: '# Run report: Titanic\n\nHist Gradient Boosting is recommended.',
@@ -138,13 +141,11 @@ describe('RunPage', () => {
 
 describe('NewRunPage', () => {
   it('goes to the new run’s page after a successful upload', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ run_id: RUN_ID, status: 'running' }), { status: 202 }),
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify(summary()), { status: 200 }))
-    vi.stubGlobal('fetch', fetchMock)
+    fakeFetch({
+      'GET /api/samples': { status: 200, body: [] },
+      'POST /api/runs': { status: 202, body: { run_id: RUN_ID, status: 'running' } },
+      [`GET /api/runs/${RUN_ID}`]: { status: 200, body: summary() },
+    })
     renderAt('/')
 
     const user = userEvent.setup()

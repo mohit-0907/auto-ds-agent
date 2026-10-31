@@ -4,17 +4,20 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fakeFetch } from '../test/fakeFetch'
 import { NewRunForm } from './NewRunForm'
 
 const csv = () => new File(['a,b\n1,2\n'], 'titanic.csv', { type: 'text/csv' })
 
-function fakeFetch(status: number, body: unknown) {
-  const fetchMock = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
-  )
-  vi.stubGlobal('fetch', fetchMock)
-  return fetchMock
-}
+const SAMPLES = [
+  {
+    name: 'mpg.csv',
+    rows: 398,
+    kind: 'regression',
+    description: "Predict a car's fuel efficiency",
+    target: 'mpg',
+  },
+]
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -25,8 +28,14 @@ async function fillForm(file: File = csv()) {
   return user
 }
 
+function postedForm(fetchMock: ReturnType<typeof fakeFetch>): FormData {
+  const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
+  return post[1]!.body as FormData
+}
+
 describe('NewRunForm', () => {
   it('keeps Start disabled until a file and a description are given', async () => {
+    fakeFetch({ 'GET /api/samples': { status: 200, body: [] } })
     render(<NewRunForm onStarted={() => {}} />)
     const start = screen.getByRole('button', { name: 'Start run' })
     expect(start).toBeDisabled()
@@ -35,8 +44,8 @@ describe('NewRunForm', () => {
     expect(start).toBeEnabled()
   })
 
-  it('refuses an unsupported file instantly, without contacting the server', async () => {
-    const fetchMock = fakeFetch(202, {})
+  it('refuses an unsupported file instantly, without uploading it', async () => {
+    const fetchMock = fakeFetch({ 'GET /api/samples': { status: 200, body: [] } })
     render(<NewRunForm onStarted={() => {}} />)
     // applyAccept: false lets the test pick a file the file dialog would normally hide
     const user = userEvent.setup({ applyAccept: false })
@@ -44,10 +53,11 @@ describe('NewRunForm', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Unsupported file type')
     expect(screen.getByRole('button', { name: 'Start run' })).toBeDisabled()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   })
 
   it('refuses a file over the size limit', async () => {
+    fakeFetch({ 'GET /api/samples': { status: 200, body: [] } })
     render(<NewRunForm onStarted={() => {}} />)
     const huge = csv()
     Object.defineProperty(huge, 'size', { value: 300 * 1024 * 1024 }) // pretend 300 MB
@@ -57,7 +67,10 @@ describe('NewRunForm', () => {
   })
 
   it('uploads the form and reports the new run id', async () => {
-    const fetchMock = fakeFetch(202, { run_id: '20261018_120000_titanic', status: 'running' })
+    const fetchMock = fakeFetch({
+      'GET /api/samples': { status: 200, body: [] },
+      'POST /api/runs': { status: 202, body: { run_id: '20261018_120000_titanic', status: 'running' } },
+    })
     const onStarted = vi.fn()
     render(<NewRunForm onStarted={onStarted} />)
     const user = await fillForm()
@@ -65,17 +78,20 @@ describe('NewRunForm', () => {
     await user.click(screen.getByRole('button', { name: 'Start run' }))
 
     expect(onStarted).toHaveBeenCalledWith('20261018_120000_titanic')
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/runs')
-    expect(init.method).toBe('POST')
-    const sent = init.body as FormData
+    const sent = postedForm(fetchMock)
     expect((sent.get('file') as File).name).toBe('titanic.csv')
     expect(sent.get('description')).toBe('Predict survival')
     expect(sent.get('target')).toBe('Survived')
   })
 
   it("shows the server's reason when it refuses the run", async () => {
-    fakeFetch(409, { detail: 'A run is already in progress; try again when it finishes.' })
+    fakeFetch({
+      'GET /api/samples': { status: 200, body: [] },
+      'POST /api/runs': {
+        status: 409,
+        body: { detail: 'A run is already in progress; try again when it finishes.' },
+      },
+    })
     const onStarted = vi.fn()
     render(<NewRunForm onStarted={onStarted} />)
     const user = await fillForm()
@@ -86,10 +102,51 @@ describe('NewRunForm', () => {
   })
 
   it('accepts a dropped file', () => {
+    fakeFetch({ 'GET /api/samples': { status: 200, body: [] } })
     render(<NewRunForm onStarted={() => {}} />)
     const dropZone = screen.getByText('Drop a CSV or Parquet file here')
     fireEvent.drop(dropZone, { dataTransfer: { files: [csv()] } })
 
     expect(screen.getByText('titanic.csv')).toBeInTheDocument()
+  })
+
+  it('a sample chip fills the form and starts a run without an upload', async () => {
+    const fetchMock = fakeFetch({
+      'GET /api/samples': { status: 200, body: SAMPLES },
+      'POST /api/runs': { status: 202, body: { run_id: 'r-mpg', status: 'running' } },
+    })
+    const onStarted = vi.fn()
+    render(<NewRunForm onStarted={onStarted} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /mpg\.csv/ }))
+
+    expect(screen.getByLabelText('What do you want to predict?')).toHaveValue(
+      "Predict a car's fuel efficiency",
+    )
+    expect(screen.getByLabelText(/Target column/)).toHaveValue('mpg')
+    expect(screen.getByText(/398 rows · sample dataset/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Start run' }))
+    expect(onStarted).toHaveBeenCalledWith('r-mpg')
+    const sent = postedForm(fetchMock)
+    expect(sent.get('sample')).toBe('mpg.csv')
+    expect(sent.get('file')).toBeNull()
+  })
+
+  it('the X button clears the chosen file without opening the file picker', async () => {
+    fakeFetch({ 'GET /api/samples': { status: 200, body: [] } })
+    render(<NewRunForm onStarted={() => {}} />)
+    await fillForm()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Remove file' }))
+
+    expect(screen.getByText('Drop a CSV or Parquet file here')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start run' })).toBeDisabled()
+  })
+
+  it('hides the samples row when the server has none', async () => {
+    fakeFetch({ 'GET /api/samples': { status: 500, body: {} } })
+    render(<NewRunForm onStarted={() => {}} />)
+    await Promise.resolve()
+    expect(screen.queryByText('Or try a sample dataset')).not.toBeInTheDocument()
   })
 })

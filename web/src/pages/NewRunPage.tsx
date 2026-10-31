@@ -1,15 +1,26 @@
-// URL "/": the upload form. On success, go to the new run's own page.
+// URL "/": the upload form beside "What the agent does". On success, open the new run.
 
 import { useNavigate } from 'react-router'
 import { NewRunForm } from '../components/NewRunForm'
+import { PipelineAside } from '../components/PipelineAside'
 
 export function NewRunPage() {
   const navigate = useNavigate() // a function that changes the URL, like clicking a link
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-5 text-base font-semibold">Start a new run</h2>
-      <NewRunForm onStarted={(runId) => navigate(`/runs/${runId}`)} />
-    </section>
+    // Two columns that wrap: the aside drops below the form on narrow screens.
+    <div className="flex max-w-[1080px] flex-wrap items-start gap-10 px-9 pt-10 pb-16">
+      <div className="min-w-0 flex-[1_1_420px]">
+        <h1 className="mt-0 mb-2 font-display text-4xl font-normal tracking-[-0.015em]">
+          Start a new run
+        </h1>
+        <p className="mt-0 mb-7 max-w-[54ch] text-[15px] text-pretty text-muted">
+          Upload a table and say what you want to predict. The agent profiles it, writes and
+          repairs feature code, benchmarks six models and explains its pick.
+        </p>
+        <NewRunForm onStarted={(runId) => navigate(`/runs/${runId}`)} />
+      </div>
+      <PipelineAside />
+    </div>
   )
 }

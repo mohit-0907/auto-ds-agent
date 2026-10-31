@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { listRuns } from '../api'
 import type { RunListItem } from '../types'
-import { StatusPill } from '../components/StatusPill'
+import { StatusTag } from '../components/StatusTag'
 
 function when(created: string | null): string {
   return created ? new Date(created).toLocaleString() : '–'
@@ -62,7 +62,7 @@ export function HistoryPage() {
                   <td className="py-2 pr-3 text-slate-600">{run.task_type ?? '–'}</td>
                   <td className="py-2 pr-3 text-slate-600">{run.best_model_id ?? '–'}</td>
                   <td className="py-2">
-                    <StatusPill status={run.status} />
+                    <StatusTag status={run.status} outcome={run.outcome} />
                   </td>
                 </tr>
               ))}
