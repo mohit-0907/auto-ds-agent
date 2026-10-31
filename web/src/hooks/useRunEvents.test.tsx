@@ -1,11 +1,12 @@
 import { render, renderHook, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { stageEvent } from '../test/events'
 import { FakeEventSource } from '../test/fakeEventSource'
 import { useRunEvents } from './useRunEvents'
 
 function stage(index: number, node: string) {
-  return { index, node, ok: true, text: node, attempt: 0, at: '2026-10-18T10:00:00' }
+  return stageEvent({ index, node })
 }
 
 beforeEach(() => {

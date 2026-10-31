@@ -150,6 +150,12 @@ SSE_POLL_INTERVAL_S = 0.25
 # a connection that waits a long time (the arena can be quiet for a while).
 SSE_KEEPALIVE_S = 15.0
 
+# Each stage event carries an expandable detail (generated code, a traceback, the
+# router's decision). Capped so one event stays small in events.jsonl and on the wire;
+# 12k characters fits a full generated feature file with room to spare.
+EVENT_DETAIL_MAX_CHARS = 12_000
+EVENT_DETAIL_PROFILE_COLUMNS = 8  # columns listed in the profiler step's detail
+
 # --- Profiler --------------------------------------------------------------
 
 MAX_DATASET_MB = 200  # Checked against file size on disk, before loading.

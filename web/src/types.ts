@@ -15,6 +15,13 @@ export interface StageEvent {
   text: string // e.g. "attempt 1 failed: KeyError: 'Deck'"
   attempt: number
   at: string // ISO timestamp
+  detail: string | null // what an expanded step shows: code, a decision, a traceback
+  detail_kind: 'code' | 'error' | null
+  // Header facts, set only by the stage that learns them (profiler; router / sanity check)
+  n_rows: number | null
+  n_cols: number | null
+  task_type: string | null
+  target_column: string | null
 }
 
 /** One model's cross-validated scores from the arena. */

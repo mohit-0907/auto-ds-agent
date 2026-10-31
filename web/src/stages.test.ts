@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { formatMetric, groupTimeline, nextStage, relativeTime, runSubline, statusTag } from './stages'
+import {
+  attemptStatus,
+  clock,
+  formatMetric,
+  graphCaption,
+  groupTimeline,
+  nextStage,
+  pipelineState,
+  relativeTime,
+  runFacts,
+  runSubline,
+  statusTag,
+} from './stages'
+import { stageEvent } from './test/events'
 import type { RunListItem, StageEvent } from './types'
 
 let next = 0
 function ev(node: string, attempt = 0, ok = true): StageEvent {
-  return { index: next++, node, ok, text: node, attempt, at: '2026-10-18T10:00:00' }
+  return stageEvent({ index: next++, node, ok, attempt })
 }
 
 describe('groupTimeline', () => {
@@ -114,5 +127,132 @@ describe('runSubline', () => {
   it('falls back to the task when there is no model', () => {
     const none = { ...base, outcome: 'no_model' as const, best_model_id: null, best_model_name: null, best_score: null }
     expect(runSubline(none)).toBe('No model · Regression')
+  })
+})
+
+describe('clock', () => {
+  it('formats seconds as mm:ss, with minutes past an hour', () => {
+    expect(clock(0)).toBe('00:00')
+    expect(clock(38.9)).toBe('00:38')
+    expect(clock(65)).toBe('01:05')
+    expect(clock(3725)).toBe('62:05')
+    expect(clock(-3)).toBe('00:00') // clocks a hair apart never show negative time
+  })
+})
+
+describe('runFacts', () => {
+  it('reads the typed fields, the latest value winning', () => {
+    const facts = runFacts([
+      stageEvent({ node: 'profiler', n_rows: 891, n_cols: 12 }),
+      stageEvent({ node: 'router', task_type: 'regression', target_column: 'Survived' }),
+      stageEvent({ node: 'sanity_check', task_type: 'binary_classification', target_column: 'Survived' }),
+      stageEvent({ node: 'arena' }), // no facts: leaves the others alone
+    ])
+    expect(facts).toEqual({
+      taskType: 'binary_classification',
+      targetColumn: 'Survived',
+      nRows: 891,
+      nCols: 12,
+    })
+  })
+
+  it('is all null before the profiler finishes', () => {
+    expect(runFacts([])).toEqual({ taskType: null, targetColumn: null, nRows: null, nCols: null })
+  })
+})
+
+describe('pipelineState', () => {
+  const head = () => [ev('profiler'), ev('router'), ev('sanity_check')]
+
+  it('marks the stage in progress active and the rest pending while live', () => {
+    next = 0
+    const { nodes, attempt, fallback } = pipelineState(head(), true)
+    expect(nodes.profiler).toBe('done')
+    expect(nodes.sanity_check).toBe('done')
+    expect(nodes.fe_codegen).toBe('active')
+    expect(nodes.sandbox).toBe('pending')
+    expect(nodes.reporter).toBe('pending')
+    expect(attempt).toBe(0)
+    expect(fallback).toBe('idle')
+  })
+
+  it('shows a retry: the failed sandbox stays red while codegen tries again', () => {
+    next = 0
+    const events = [...head(), ev('fe_codegen', 1), ev('sandbox', 1, false)]
+    const { nodes, attempt } = pipelineState(events, true)
+    expect(nodes.sandbox).toBe('fail')
+    expect(nodes.fe_codegen).toBe('active')
+    expect(attempt).toBe(1)
+  })
+
+  it('a repaired run ends with every node done', () => {
+    next = 0
+    const events = [
+      ...head(),
+      ev('fe_codegen', 1),
+      ev('sandbox', 1, false),
+      ev('fe_codegen', 2),
+      ev('sandbox', 2),
+      ev('arena', 2),
+      ev('artifacts', 2),
+      ev('reporter', 2),
+      ev('finalize', 2),
+    ]
+    const { nodes, attempt, fallback } = pipelineState(events, false)
+    expect(Object.values(nodes).every((state) => state === 'done')).toBe(true)
+    expect(attempt).toBe(2)
+    expect(fallback).toBe('idle')
+  })
+
+  it('three failures: the fallback becomes active, then used', () => {
+    next = 0
+    const failures = [1, 2, 3].flatMap((n) => [ev('fe_codegen', n), ev('sandbox', n, false)])
+    expect(pipelineState([...head(), ...failures], true).fallback).toBe('active')
+
+    const after = [...head(), ...failures, ev('fallback_fe', 3), ev('arena', 3)]
+    const state = pipelineState(after, true)
+    expect(state.fallback).toBe('used')
+    expect(state.nodes.sandbox).toBe('fail')
+    expect(state.nodes.artifacts).toBe('active')
+  })
+
+  it('an early exit leaves the unvisited nodes skipped', () => {
+    next = 0
+    const events = [...head(), ev('reporter'), ev('finalize')]
+    const { nodes } = pipelineState(events, false)
+    expect(nodes.fe_codegen).toBe('skipped')
+    expect(nodes.arena).toBe('skipped')
+    expect(nodes.reporter).toBe('done')
+  })
+})
+
+describe('graphCaption', () => {
+  it('estimates the total while live, growing with retries', () => {
+    next = 0
+    const five = [ev('profiler'), ev('router'), ev('sanity_check'), ev('fe_codegen', 1), ev('sandbox', 1)]
+    expect(graphCaption(five, 'running', null, true, null)).toBe('Live · 5 of ~9 stages')
+    // A failed sandbox means another codegen + sandbox: the estimate grows to 11.
+    const retry = [...five.slice(0, 4), ev('sandbox', 1, false)]
+    expect(graphCaption(retry, 'running', null, true, null)).toBe('Live · 5 of ~11 stages')
+  })
+
+  it('says how a finished run ended', () => {
+    next = 0
+    expect(graphCaption([ev('finalize')], 'finished', 'model', false, 60)).toBe('Completed in 01:00')
+    expect(graphCaption([], 'finished', 'fallback', false, 60)).toBe(
+      'Recovered with the fallback recipe',
+    )
+    const stopped = [ev('profiler'), ev('router'), ev('sanity_check'), ev('reporter'), ev('finalize')]
+    expect(graphCaption(stopped, 'finished', 'no_model', false, 9)).toBe('Stopped at Check decision')
+    expect(graphCaption([], 'failed', null, false, null)).toBe('The run crashed')
+  })
+})
+
+describe('attemptStatus', () => {
+  it("uses the attempt's sandbox verdict, or in progress while live", () => {
+    next = 0
+    expect(attemptStatus([ev('fe_codegen', 1), ev('sandbox', 1)], false)).toBe('passed')
+    expect(attemptStatus([ev('fe_codegen', 1), ev('sandbox', 1, false)], false)).toBe('failed')
+    expect(attemptStatus([ev('fe_codegen', 2)], true)).toBe('in progress')
   })
 })
