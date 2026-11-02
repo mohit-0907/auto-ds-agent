@@ -24,11 +24,11 @@ from pathlib import Path
 from typing import Literal
 
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from autods.graph import initial_state
 from autods.progress import GraphRun, StageEvent
-from autods.state import ModelResult
+from autods.state import ModelResult, Selection
 
 log = structlog.get_logger(__name__)
 
@@ -77,6 +77,13 @@ class RunListItem(BaseModel):
     last_event: StageEvent | None  # only while running: what the agent finished last
 
 
+class DownloadFile(BaseModel):
+    """A run file the browser can download, with its size for the artifacts card."""
+
+    name: str
+    size_bytes: int
+
+
 class RunSummary(BaseModel):
     """Everything the browser needs about one run. All of it comes from state/artifacts."""
 
@@ -91,12 +98,13 @@ class RunSummary(BaseModel):
     task_type: str | None
     best_model_id: str | None
     leaderboard: list[ModelResult]
+    selection: Selection | None  # why best_model_id won; None for runs saved before it existed
     report_markdown: str | None
     token_cost_usd: float
     warnings: list[str]
     error: str | None
     files: list[str]
-    downloads: list[str]  # the files in `files` that GET .../files/{name} will serve
+    downloads: list[DownloadFile]  # the files in `files` that GET .../files/{name} will serve
 
 
 @dataclass
@@ -122,6 +130,14 @@ def _outcome(status: RunStatus, record: dict) -> RunOutcome | None:
     if (record.get("feature_engineering") or {}).get("final_source") == "fallback":
         return "fallback"
     return "model"
+
+
+def _read_selection(record: dict) -> Selection | None:
+    """The arena's selection record from run.json; None if absent (older runs) or unreadable."""
+    try:
+        return Selection.model_validate(record["selection"]) if record.get("selection") else None
+    except ValidationError:
+        return None
 
 
 def _read_events(path: Path) -> list[StageEvent]:
@@ -272,12 +288,17 @@ class RunManager:
             task_type=decision.get("task_type"),
             best_model_id=record.get("best_model_id"),
             leaderboard=[ModelResult.model_validate(r) for r in record.get("leaderboard", [])],
+            selection=_read_selection(record),
             report_markdown=report.read_text(encoding="utf-8") if report.exists() else None,
             token_cost_usd=record.get("token_cost_usd", 0.0),
             warnings=record.get("warnings", []),
             error=error.read_text(encoding="utf-8") if error.exists() else None,
             files=sorted(p.name for p in run_dir.iterdir() if p.is_file()),
-            downloads=[name for name in DOWNLOADABLE if (run_dir / name).is_file()],
+            downloads=[
+                DownloadFile(name=name, size_bytes=(run_dir / name).stat().st_size)
+                for name in DOWNLOADABLE
+                if (run_dir / name).is_file()
+            ],
         )
 
     def list_runs(self) -> list[RunListItem]:

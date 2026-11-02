@@ -155,7 +155,7 @@ function Results({ summary }: { summary: RunSummary }) {
         </Card>
       )}
       <Card title="Downloads">
-        <Downloads runId={summary.run_id} files={summary.downloads} />
+        <Downloads runId={summary.run_id} files={summary.downloads.map((d) => d.name)} />
       </Card>
     </>
   )

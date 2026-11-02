@@ -56,6 +56,12 @@ def test_full_arena_on_titanic(tmp_path: Path) -> None:
     assert leaderboard[-1].model_id == "dummy"  # ranked last: everything beats chance
     assert update["best_model_id"] in {"logreg", "hgb", "lgbm", "xgb", "rf"}
 
+    # The evidence for the choice: the chosen model against each of the 4 other real models.
+    selection = update["selection"]
+    assert selection.chosen_model_id == update["best_model_id"]
+    assert len(selection.comparisons) == 4
+    assert selection.baseline.kind == "difference" and selection.baseline.value > 0.3
+
     csv = pd.read_csv(tmp_path / "run" / "leaderboard.csv")
     assert csv["is_best"].sum() == 1
     assert csv.loc[csv["is_best"], "model_id"].item() == update["best_model_id"]
@@ -68,7 +74,7 @@ def comparable(update: dict) -> tuple:
         (r.model_id, r.status, r.metrics, r.metrics_std, r.fold_scores)
         for r in update["leaderboard"]
     ]
-    return update["best_model_id"], rows
+    return update["best_model_id"], rows, update["selection"]
 
 
 def test_dod_same_features_give_an_identical_leaderboard(tmp_path: Path) -> None:

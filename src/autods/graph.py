@@ -180,6 +180,7 @@ def initial_state(
         processed_data_path=None,
         leaderboard=[],
         best_model_id=None,
+        selection=None,
         report=None,
         warnings=[],
         token_cost_usd=0.0,

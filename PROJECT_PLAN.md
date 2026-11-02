@@ -306,7 +306,7 @@ Tasks:
 *Redesign added on 2026-10-30 from `docs/design_handoff_auto_ds_agent_ui/` (high-fidelity, "Organic" design system: app shell with a run sidebar, light/dark theme, pipeline graph, tabs). Decisions: lift and fold verdicts are computed by the server, not the browser (invariant 9); fonts are bundled via @fontsource; a real samples endpoint lets a run start without an upload.*
 - **7.6** Design foundation + app shell + New run: tokens (light/dark) mapped into Tailwind, bundled fonts, `lucide-react` icons, theme toggle, sidebar run list, top bar, status-tag mapping, restyled New run screen with the "What the agent does" aside and sample datasets (`GET /api/samples`, start a run from a sample).
 - **7.7** Run screen: header chips, pipeline graph (pure, tested graph-state function), tabs, Steps tab with expandable rows and attempt groups; backend: per-event `detail`.
-- **7.8** Results tab + failure states: recommendation card, "why this model" fold squares, artifacts with sizes, leaderboard with fold dots, warnings strip, no-model and fallback states; backend: `selection` + lift + file sizes in `RunSummary`.
+- **7.8** (split: 7.8a backend, 7.8b UI) Results tab + failure states: recommendation card, "why this model" fold squares, artifacts with sizes, leaderboard with fold dots, warnings strip, no-model and fallback states; backend: `selection` + lift + file sizes in `RunSummary`.
 - **7.9** Report tab, Feature code tab, All runs page (search + status filter), narrow-screen sidebar drawer; backend: richer `RunListItem`.
 - **7.10** Production serve + DoD: `autods serve` serves the built frontend (SPA fallback); walkthrough on a never-seen CSV.
 

@@ -31,6 +31,7 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     error: null,
     files: [],
     downloads: [],
+    selection: null,
     outcome: null,
     ...overrides,
   }
@@ -42,7 +43,10 @@ const FINISHED = summary({
   best_model_id: 'hgb',
   token_cost_usd: 0.0255,
   report_markdown: '# Run report: Titanic\n\nHist Gradient Boosting is recommended.',
-  downloads: ['report.md', 'best_pipeline.joblib'],
+  downloads: [
+    { name: 'report.md', size_bytes: 2048 },
+    { name: 'best_pipeline.joblib', size_bytes: 412_000 },
+  ],
   leaderboard: [
     {
       model_id: 'hgb',

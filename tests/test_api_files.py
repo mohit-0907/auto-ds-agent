@@ -42,9 +42,17 @@ def test_download_an_artifact(client: TestClient) -> None:
 def test_summary_lists_exactly_the_downloadable_files(client: TestClient) -> None:
     summary = client.get(f"/api/runs/{RUN_ID}").json()
 
-    assert summary["downloads"] == ["report.md", "fe_code.py", "run.json"]  # allowlist order
+    names = [d["name"] for d in summary["downloads"]]
+    assert names == ["report.md", "fe_code.py", "run.json"]  # allowlist order
     assert "request.json" in summary["files"]  # present in the folder...
-    assert "request.json" not in summary["downloads"]  # ...but not offered
+    assert "request.json" not in names  # ...but not offered
+    # The size on disk, for the artifacts card: "# Run report\n" is 13 bytes.
+    assert summary["downloads"][0] == {"name": "report.md", "size_bytes": 13}
+
+
+def test_a_run_saved_before_selection_existed_has_none(client: TestClient) -> None:
+    # This run.json has no "selection" key, like every run from before Task 7.8.
+    assert client.get(f"/api/runs/{RUN_ID}").json()["selection"] is None
 
 
 @pytest.mark.parametrize(

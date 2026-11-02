@@ -89,6 +89,10 @@ def test_upload_runs_the_agent_and_reports_results(
     assert run["best_model_id"] == "logreg"
     assert run["task_type"] == "binary_classification"
     assert [r["model_id"] for r in run["leaderboard"]] == ["logreg", "dummy"]
+    # The arena's selection record survives the trip through run.json.
+    assert run["selection"]["chosen_model_id"] == "logreg"
+    assert run["selection"]["comparisons"] == []  # no other real model in this quick arena
+    assert run["selection"]["baseline"]["kind"] == "difference"
     assert "## Leaderboard" in run["report_markdown"]
     assert {"report.md", "run.json", "best_pipeline.joblib", "events.jsonl"} <= set(run["files"])
 
