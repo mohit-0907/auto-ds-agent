@@ -154,16 +154,17 @@ describe('RunPage', () => {
 
     source.emit('end', { status: 'finished' })
     // The run ended: the page switches to Results by itself.
-    const result = await screen.findByRole('region', { name: 'Result' })
+    const result = await screen.findByRole('region', { name: 'Recommendation' })
     expect(screen.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true')
-    expect(result).toHaveTextContent('Recommended model: Hist Gradient Boosting · ROC-AUC 0.882')
-    expect(result).toHaveTextContent('LLM cost $0.0255')
+    expect(within(result).getByRole('heading', { name: 'Hist Gradient Boosting' })).toBeInTheDocument()
+    expect(result).toHaveTextContent('0.882ROC-AUC')
     expect(screen.queryByText('working…')).not.toBeInTheDocument()
 
     const leaderboard = screen.getByRole('region', { name: 'Leaderboard' })
-    expect(within(leaderboard).getByText('chosen')).toBeInTheDocument()
-    const downloads = screen.getByRole('region', { name: 'Downloads' })
-    expect(within(downloads).getByRole('link', { name: /best_pipeline\.joblib/ })).toHaveAttribute(
+    expect(within(leaderboard).getByText('selected')).toBeInTheDocument()
+    const artifacts = screen.getByRole('region', { name: 'Artifacts' })
+    expect(artifacts).toHaveTextContent('LLM cost$0.0255')
+    expect(within(artifacts).getByRole('link', { name: /best_pipeline\.joblib/ })).toHaveAttribute(
       'href',
       `/api/runs/${RUN_ID}/files/best_pipeline.joblib`,
     )
@@ -188,7 +189,7 @@ describe('RunPage', () => {
       }),
     )
     source.emit('end', { status: 'finished' })
-    await screen.findByRole('region', { name: 'Result' })
+    await screen.findByRole('region', { name: 'Recommendation' })
     await user.click(screen.getByRole('tab', { name: /Steps/ }))
 
     // A step without a detail is not a button; one with a detail is, closed at first.
@@ -215,7 +216,7 @@ describe('RunPage', () => {
     source.emit('stage', stage(0, 'profiler', 'p'))
     source.emit('stage', stage(12, 'finalize', 'run.json written'))
     source.emit('end', { status: 'finished' })
-    await screen.findByRole('region', { name: 'Result' })
+    await screen.findByRole('region', { name: 'Recommendation' })
 
     // The last event is at 12:01:00, one minute after created_at.
     expect(screen.getByRole('list', { name: 'Run facts' })).toHaveTextContent('duration01:00')

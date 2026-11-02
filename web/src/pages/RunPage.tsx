@@ -3,23 +3,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, getRun } from '../api'
-import { Downloads } from '../components/Downloads'
-import { Leaderboard } from '../components/Leaderboard'
 import { PipelineGraph } from '../components/PipelineGraph'
 import { ReportView } from '../components/ReportView'
+import { ResultsTab } from '../components/ResultsTab'
 import { RunHeader } from '../components/RunHeader'
 import { RunTabs, type TabSpec } from '../components/RunTabs'
 import { Timeline } from '../components/Timeline'
 import { useNow } from '../hooks/useNow'
 import { useRunEvents } from '../hooks/useRunEvents'
-import {
-  METRIC_LABELS,
-  formatMetric,
-  graphCaption,
-  pipelineState,
-  runFacts,
-  secondsBetween,
-} from '../stages'
+import { graphCaption, pipelineState, runFacts, secondsBetween } from '../stages'
 import type { RunStatus, RunSummary } from '../types'
 
 type TabId = 'results' | 'steps' | 'report'
@@ -133,7 +125,9 @@ function RunView({ runId }: { runId: string }) {
         {tab === 'steps' && (
           <Timeline events={events} live={live} startIso={startIso} open={open} onToggle={toggle} />
         )}
-        {tab === 'results' && summary && <Results summary={summary} />}
+        {tab === 'results' && summary && (
+          <ResultsTab summary={summary} onOpenReport={() => setChoice({ tab: 'report', live })} />
+        )}
         {tab === 'report' && summary?.report_markdown && (
           <Card title="Report">
             <ReportView markdown={summary.report_markdown} />
@@ -141,45 +135,6 @@ function RunView({ runId }: { runId: string }) {
         )}
       </div>
     </div>
-  )
-}
-
-// The Results tab as in 7.5; Task 7.8 replaces it with the redesigned results.
-function Results({ summary }: { summary: RunSummary }) {
-  return (
-    <>
-      <ResultCard summary={summary} />
-      {summary.leaderboard.length > 0 && (
-        <Card title="Leaderboard">
-          <Leaderboard leaderboard={summary.leaderboard} bestModelId={summary.best_model_id} />
-        </Card>
-      )}
-      <Card title="Downloads">
-        <Downloads runId={summary.run_id} files={summary.downloads.map((d) => d.name)} />
-      </Card>
-    </>
-  )
-}
-
-function ResultCard({ summary }: { summary: RunSummary }) {
-  const best = summary.leaderboard.find((r) => r.model_id === summary.best_model_id)
-  let headline: string
-  if (summary.status === 'failed') {
-    headline = `The run crashed: ${summary.error ?? 'unknown error'}`
-  } else if (summary.status === 'interrupted') {
-    headline = 'The run stopped before finishing (for example, the server was restarted).'
-  } else if (best) {
-    const metric = best.primary_metric
-    headline = `Recommended model: ${best.model_name} · ${METRIC_LABELS[metric] ?? metric} ${formatMetric(best.metrics[metric])}`
-  } else {
-    headline = 'The run ended without a model. The report explains why.'
-  }
-
-  return (
-    <section className="rounded-[28px] bg-card p-6 shadow-card" aria-label="Result">
-      <p className="m-0 font-semibold">{headline}</p>
-      <p className="mt-1 mb-0 text-sm text-muted">LLM cost ${summary.token_cost_usd.toFixed(4)}</p>
-    </section>
   )
 }
 
