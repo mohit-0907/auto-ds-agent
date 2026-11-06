@@ -20,7 +20,7 @@ from typing import Annotated
 import structlog
 import typer
 
-from autods.config import RUNS_DIR
+from autods.config import RUNS_DIR, WEB_DIST_DIR
 from autods.graph import initial_state, new_run_dir
 from autods.progress import GraphRun
 
@@ -90,13 +90,20 @@ def serve(
     ] = RUNS_DIR,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed logs.")] = False,
 ) -> None:
-    """Start the web API (interactive docs at http://HOST:PORT/docs)."""
+    """Start the web app: the React frontend and the API it calls, on one port."""
     import uvicorn
 
     from autods.api.app import create_app
 
     _configure_logging(verbose)
-    typer.echo(f"autods API on http://{host}:{port}  ·  try it at http://{host}:{port}/docs")
+    url = f"http://{host}:{port}"
+    if (WEB_DIST_DIR / "index.html").is_file():
+        typer.echo(f"autods web app on {url}  ·  API docs at {url}/docs")
+    else:
+        typer.echo(
+            f"autods API on {url}/docs  ·  the web app is not built yet: "
+            "run `cd web && npm install && npm run build`, then restart."
+        )
     uvicorn.run(
         create_app(runs_dir), host=host, port=port, log_level="info" if verbose else "warning"
     )

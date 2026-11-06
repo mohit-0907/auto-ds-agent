@@ -24,6 +24,8 @@ PACKAGE_ROOT = Path(__file__).parent
 PROJECT_ROOT = PACKAGE_ROOT.parent.parent
 PROMPTS_DIR = PACKAGE_ROOT / "prompts"
 RUNS_DIR = PROJECT_ROOT / "runs"
+# The built React app (`cd web && npm run build`). `autods serve` serves it next to the API.
+WEB_DIST_DIR = PROJECT_ROOT / "web" / "dist"
 
 # --- Models ----------------------------------------------------------------
 # Model strings are "<provider>:<model-id>"; autods.llm.get_llm dispatches on the

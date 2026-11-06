@@ -7,6 +7,7 @@
     GET  /api/runs/{run_id}/events   live stage events as Server-Sent Events
     GET  /api/runs/{run_id}/files/{name}   download one run artifact (allowlisted names)
     GET  /api/health          liveness check
+    GET  /anything-else       the built React app (files from web/dist, else index.html)
 
 Interactive documentation is generated automatically at /docs.
 """
@@ -23,7 +24,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from autods.api.runs import (
@@ -41,6 +42,7 @@ from autods.config import (
     SSE_KEEPALIVE_S,
     SSE_POLL_INTERVAL_S,
     SUPPORTED_EXTENSIONS,
+    WEB_DIST_DIR,
 )
 from autods.graph import new_run_dir
 
@@ -144,8 +146,18 @@ def _samples(datasets_dir: Path) -> list[SampleDataset]:
     return found
 
 
-def create_app(runs_dir: Path = RUNS_DIR, datasets_dir: Path = DATASETS_DIR) -> FastAPI:
-    """Build the app. A factory, so tests and `autods serve` can choose the folders."""
+def create_app(
+    runs_dir: Path = RUNS_DIR,
+    datasets_dir: Path = DATASETS_DIR,
+    web_dir: Path | None = WEB_DIST_DIR,
+) -> FastAPI:
+    """Build the app. A factory, so tests and `autods serve` can choose the folders.
+
+    Args:
+        runs_dir: Where run folders are created and read.
+        datasets_dir: Where the sample datasets live.
+        web_dir: The built frontend (web/dist); None serves the API only.
+    """
     app = FastAPI(
         title="auto-ds-agent API",
         version="0.1.0",
@@ -259,4 +271,55 @@ def create_app(runs_dir: Path = RUNS_DIR, datasets_dir: Path = DATASETS_DIR) -> 
             content_disposition_type="attachment",
         )
 
+    # Last, so every /api route above is matched first.
+    _add_frontend(app, web_dir)
     return app
+
+
+# The kinds of file in the Vite build. Python guesses types from the operating system,
+# which on this machine knows no font types and on some Windows setups calls .js
+# "text/plain" -- and a browser refuses to run a script served as text/plain.
+_WEB_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+}
+
+FRONTEND_MISSING = (
+    "The web app is not built yet. Build it once with\n\n"
+    "    cd web && npm install && npm run build\n\n"
+    "then restart `autods serve`. The API itself is running: see /docs."
+)
+
+
+def _add_frontend(app: FastAPI, web_dir: Path | None) -> None:
+    """Serve the built React app from the same server as the API.
+
+    A request for a file that exists in the build (/assets/index-3f2a.js, /favicon.svg)
+    gets that file. Any other page address (/runs, /runs/<id>) gets index.html: those
+    pages exist only inside the React app, whose router draws them in the browser
+    ("SPA fallback"). Without it, reloading /runs/<id> would be a 404.
+    """
+    root = web_dir.resolve() if web_dir is not None else None
+    index = root / "index.html" if root is not None else None
+    built = index is not None and index.is_file()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str) -> Response:
+        if path == "api" or path.startswith("api/"):
+            # A mistyped API address must fail as an API error, not return a web page.
+            raise HTTPException(404, f"No API route /{path}.")
+        if not built:
+            return PlainTextResponse(FRONTEND_MISSING, status_code=503)
+        file = (root / path).resolve()
+        # resolve() + is_relative_to: "../.env" or an absolute path cannot leave the build.
+        if path and file.is_file() and file.is_relative_to(root):
+            return FileResponse(file, media_type=_WEB_TYPES.get(file.suffix))
+        # index.html names the current build's hashed asset files, so the browser must
+        # check for a new one each time; the hashed assets themselves never change.
+        return FileResponse(
+            index, media_type=_WEB_TYPES[".html"], headers={"Cache-Control": "no-cache"}
+        )
