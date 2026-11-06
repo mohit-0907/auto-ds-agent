@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   attemptStatus,
   clock,
+  codeTag,
+  filterRuns,
   formatMetric,
   graphCaption,
   groupTimeline,
@@ -254,5 +256,65 @@ describe('attemptStatus', () => {
     expect(attemptStatus([ev('fe_codegen', 1), ev('sandbox', 1)], false)).toBe('passed')
     expect(attemptStatus([ev('fe_codegen', 1), ev('sandbox', 1, false)], false)).toBe('failed')
     expect(attemptStatus([ev('fe_codegen', 2)], true)).toBe('in progress')
+  })
+})
+
+describe('codeTag', () => {
+  it('names the attempt whose code passed the sandbox', () => {
+    next = 0
+    const events = [ev('fe_codegen', 1), ev('sandbox', 1, false), ev('fe_codegen', 2), ev('sandbox', 2)]
+    expect(codeTag(events, 'model')).toEqual({ label: 'attempt 2 · passed validation', tone: 'ok' })
+  })
+
+  it('says when the features came from the fallback recipe', () => {
+    next = 0
+    const events = [ev('sandbox', 3, false), ev('fallback_fe', 3)]
+    expect(codeTag(events, 'fallback')).toEqual({ label: 'fallback recipe', tone: 'warn' })
+    expect(codeTag(events, null)).toEqual({ label: 'fallback recipe', tone: 'warn' }) // from events alone
+  })
+
+  it('has no tag without a passing attempt', () => {
+    expect(codeTag([], null)).toBeNull()
+  })
+})
+
+describe('filterRuns', () => {
+  const run = (over: Partial<RunListItem>): RunListItem => ({
+    run_id: 'r',
+    status: 'finished',
+    outcome: 'model',
+    dataset: 'mpg.csv',
+    description: 'Predict fuel efficiency',
+    target_column: null,
+    created_at: null,
+    task_type: 'regression',
+    best_model_id: 'hgb',
+    best_model_name: 'HGB',
+    primary_metric: 'rmse',
+    best_score: 2.8,
+    last_event: null,
+    ...over,
+  })
+  const runs = [
+    run({ run_id: 'mpg' }),
+    run({ run_id: 'live', dataset: 'penguins.csv', description: 'Species', status: 'running', outcome: null }),
+    run({ run_id: 'tips', dataset: 'tips.csv', description: 'Tip amount', outcome: 'fallback' }),
+    run({ run_id: 'flights', dataset: 'flights.csv', description: 'Forecast', outcome: 'no_model' }),
+    run({ run_id: 'crash', dataset: 'big.csv', description: 'x', status: 'failed', outcome: null }),
+    run({ run_id: 'stop', dataset: 'mid.csv', description: 'x', status: 'interrupted', outcome: null }),
+  ]
+  const ids = (list: RunListItem[]) => list.map((r) => r.run_id)
+
+  it('filters by status; "No model" is every run that ended without one', () => {
+    expect(ids(filterRuns(runs, '', 'all'))).toHaveLength(6)
+    expect(ids(filterRuns(runs, '', 'running'))).toEqual(['live'])
+    expect(ids(filterRuns(runs, '', 'finished'))).toEqual(['mpg', 'tips']) // fallback still has a model
+    expect(ids(filterRuns(runs, '', 'no_model'))).toEqual(['flights', 'crash', 'stop'])
+  })
+
+  it('searches dataset and description, ignoring case and surrounding spaces', () => {
+    expect(ids(filterRuns(runs, '  PENGUINS ', 'all'))).toEqual(['live'])
+    expect(ids(filterRuns(runs, 'fuel', 'all'))).toEqual(['mpg'])
+    expect(ids(filterRuns(runs, 'fuel', 'running'))).toEqual([]) // both conditions must hold
   })
 })

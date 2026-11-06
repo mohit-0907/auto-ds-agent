@@ -27,6 +27,7 @@ import structlog
 from pydantic import BaseModel, ValidationError
 
 from autods.graph import initial_state
+from autods.nodes.artifacts import FE_CODE_FILE
 from autods.progress import GraphRun, StageEvent
 from autods.state import ModelResult, Selection
 
@@ -100,6 +101,7 @@ class RunSummary(BaseModel):
     leaderboard: list[ModelResult]
     selection: Selection | None  # why best_model_id won; None for runs saved before it existed
     report_markdown: str | None
+    fe_code: str | None  # fe_code.py: the features the chosen model was trained on
     token_cost_usd: float
     warnings: list[str]
     error: str | None
@@ -274,6 +276,7 @@ class RunManager:
         status = self._status(run_dir)
         events = self.events(run_id)  # after the status, for the reason in event_stream
         report = run_dir / "report.md"
+        fe_code = run_dir / FE_CODE_FILE
         error = run_dir / "error.txt"
         decision = record.get("task_decision") or {}
         return RunSummary(
@@ -290,6 +293,7 @@ class RunManager:
             leaderboard=[ModelResult.model_validate(r) for r in record.get("leaderboard", [])],
             selection=_read_selection(record),
             report_markdown=report.read_text(encoding="utf-8") if report.exists() else None,
+            fe_code=fe_code.read_text(encoding="utf-8") if fe_code.exists() else None,
             token_cost_usd=record.get("token_cost_usd", 0.0),
             warnings=record.get("warnings", []),
             error=error.read_text(encoding="utf-8") if error.exists() else None,

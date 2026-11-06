@@ -18,7 +18,7 @@ const KICKER = 'text-[11px] font-semibold tracking-[0.08em] uppercase text-muted
 
 export function Sidebar({ runs, selectedId, theme, onTheme }: Props) {
   return (
-    <aside className="flex min-h-0 flex-col border-r border-divider bg-surface">
+    <aside className="flex min-h-0 flex-1 flex-col border-r border-divider bg-surface">
       <Link to="/" className="flex items-center gap-2.5 px-[18px] pt-5 pb-4 text-ink no-underline">
         {/* Brand mark: an accent circle with a surface-coloured dot. */}
         <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full bg-accent">

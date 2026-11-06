@@ -283,3 +283,33 @@ export function attemptStatus(events: StageEvent[], live: boolean): AttemptStatu
   if (sandbox) return sandbox.ok ? 'passed' : 'failed'
   return live ? 'in progress' : 'failed'
 }
+
+// --- Feature code tab and the All runs page (Task 7.9) ------------------------------------
+
+/** The Feature code tab's tag: which attempt produced the code, or the fallback recipe. */
+export function codeTag(events: StageEvent[], outcome: RunOutcome | null): { label: string; tone: Tone } | null {
+  if (outcome === 'fallback' || events.some((e) => e.node === 'fallback_fe' && e.ok)) {
+    return { label: 'fallback recipe', tone: 'warn' }
+  }
+  const passed = [...events].reverse().find((e) => e.node === 'sandbox' && e.ok)
+  return passed ? { label: `attempt ${passed.attempt} · passed validation`, tone: 'ok' } : null
+}
+
+export type RunFilter = 'all' | 'running' | 'finished' | 'no_model'
+
+/** Which status filter a run falls under. "No model" is every run that ended without one. */
+export function runFilterOf(run: RunListItem): Exclude<RunFilter, 'all'> {
+  if (run.status === 'running') return 'running'
+  if (run.status === 'finished' && run.outcome !== 'no_model') return 'finished'
+  return 'no_model' // no model chosen, crashed, or interrupted
+}
+
+/** The All runs table's rows: matching the search (dataset or description) and the filter. */
+export function filterRuns(runs: RunListItem[], query: string, filter: RunFilter): RunListItem[] {
+  const q = query.trim().toLowerCase()
+  return runs.filter(
+    (run) =>
+      (filter === 'all' || runFilterOf(run) === filter) &&
+      (q === '' || run.dataset.toLowerCase().includes(q) || run.description.toLowerCase().includes(q)),
+  )
+}

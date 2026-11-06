@@ -68,6 +68,32 @@ describe('AppShell', () => {
     expect(screen.getByText('Finished')).toBeInTheDocument()
   })
 
+  it('on narrow screens, opens the sidebar as a drawer and closes it again', async () => {
+    // jsdom applies no CSS, so these tests check the state and the class that hides the
+    // drawer below 760 px, not what is visible on screen.
+    fakeFetch({ 'GET /api/runs': { status: 200, body: [run({ run_id: 'r1' })] } })
+    renderAt('/')
+    const user = userEvent.setup()
+    const menu = screen.getByRole('button', { name: 'Open menu' })
+    const drawer = document.getElementById('sidebar')!
+    expect(menu).toHaveAttribute('aria-controls', 'sidebar')
+    expect(drawer).toHaveClass('max-[759px]:hidden')
+
+    await user.click(menu)
+    expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute('aria-expanded', 'true')
+    expect(drawer).not.toHaveClass('max-[759px]:hidden')
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute('aria-expanded', 'false')
+
+    // Going to another page closes it: here, tapping a run inside the drawer.
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const nav = screen.getByRole('navigation', { name: 'Runs' })
+    await user.click(await within(nav).findByRole('link', { name: /mpg\.csv/ }))
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute('aria-expanded', 'false')
+    expect(drawer).toHaveClass('max-[759px]:hidden')
+  })
+
   it('switches theme, applies it to <html>, and remembers it', async () => {
     fakeFetch({ 'GET /api/runs': { status: 200, body: [] } })
     renderAt('/')

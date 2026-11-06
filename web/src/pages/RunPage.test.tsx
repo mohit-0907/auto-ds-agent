@@ -32,6 +32,7 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     files: [],
     downloads: [],
     selection: null,
+    fe_code: null,
     outcome: null,
     ...overrides,
   }
@@ -172,7 +173,9 @@ describe('RunPage', () => {
     // The report has its own tab.
     await userEvent.setup().click(screen.getByRole('tab', { name: 'Report' }))
     const report = screen.getByRole('region', { name: 'Report' })
-    expect(within(report).getByRole('heading', { name: 'Run report: Titanic' })).toBeInTheDocument()
+    // The report's own "# Run report" title is not drawn (the page header names the run).
+    expect(report).toHaveTextContent('Hist Gradient Boosting is recommended.')
+    expect(within(report).queryByRole('heading', { name: 'Run report: Titanic' })).toBeNull()
   })
 
   it('opens a step to show its detail, and remembers it across tabs', async () => {
@@ -222,6 +225,38 @@ describe('RunPage', () => {
     expect(screen.getByRole('list', { name: 'Run facts' })).toHaveTextContent('duration01:00')
     expect(screen.getByText('Completed in 01:00')).toBeInTheDocument()
     expect(screen.queryByText(/elapsed/)).not.toBeInTheDocument()
+  })
+
+  it('shows the feature code, and the report sends you to the leaderboard', async () => {
+    serveSummaries({
+      ...FINISHED,
+      fe_code: '# features\nimport pandas as pd\n',
+      report_markdown: '## Leaderboard\n\n| Model | ROC-AUC |\n|---|---|\n| HGB | 0.882 |\n',
+    })
+    renderAt(`/runs/${RUN_ID}`)
+    const user = userEvent.setup()
+    const source = FakeEventSource.latest()
+    source.emit('stage', stage(0, 'sandbox', 'attempt 1 passed validation', 1))
+    source.emit('end', { status: 'finished' })
+    await screen.findByRole('region', { name: 'Recommendation' })
+
+    await user.click(screen.getByRole('tab', { name: 'Feature code' }))
+    const code = screen.getByRole('region', { name: 'Feature code' })
+    expect(code).toHaveTextContent('attempt 1 · passed validation')
+    expect(code).toHaveTextContent('2 lines')
+
+    await user.click(screen.getByRole('tab', { name: 'Report' }))
+    await user.click(screen.getByRole('button', { name: /open in Results/ }))
+    expect(screen.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('region', { name: 'Leaderboard' })).toBeInTheDocument()
+  })
+
+  it('has no Feature code tab content for a run without code', async () => {
+    serveSummaries(FINISHED) // fe_code: null, e.g. a run that stopped before features
+    renderAt(`/runs/${RUN_ID}`)
+    FakeEventSource.latest().emit('end', { status: 'finished' })
+    await screen.findByRole('region', { name: 'Recommendation' })
+    expect(screen.getByRole('tab', { name: 'Feature code' })).toBeDisabled()
   })
 
   it('says so when the run does not exist', async () => {

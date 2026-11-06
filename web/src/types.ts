@@ -93,6 +93,7 @@ export interface RunSummary {
   leaderboard: ModelResult[]
   selection: Selection | null // null for runs saved before Task 7.8
   report_markdown: string | null
+  fe_code: string | null // fe_code.py: the features the chosen model was trained on
   token_cost_usd: number
   warnings: string[]
   error: string | null

@@ -1,8 +1,9 @@
 // URL "/runs/:runId": one run -- header, live pipeline graph, and tabs for its steps and results.
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, getRun } from '../api'
+import { CodeView } from '../components/CodeView'
 import { PipelineGraph } from '../components/PipelineGraph'
 import { ReportView } from '../components/ReportView'
 import { ResultsTab } from '../components/ResultsTab'
@@ -11,10 +12,10 @@ import { RunTabs, type TabSpec } from '../components/RunTabs'
 import { Timeline } from '../components/Timeline'
 import { useNow } from '../hooks/useNow'
 import { useRunEvents } from '../hooks/useRunEvents'
-import { graphCaption, pipelineState, runFacts, secondsBetween } from '../stages'
+import { codeTag, graphCaption, pipelineState, runFacts, secondsBetween } from '../stages'
 import type { RunStatus, RunSummary } from '../types'
 
-type TabId = 'results' | 'steps' | 'report'
+type TabId = 'results' | 'steps' | 'report' | 'code'
 
 export function RunPage() {
   const { runId = '' } = useParams() // the ":runId" part of the URL
@@ -58,10 +59,15 @@ function RunView({ runId }: { runId: string }) {
   const status: RunStatus = endStatus ?? summary?.status ?? 'running'
   const live = status === 'running' && !ended && stream !== 'error'
   const now = useNow(live) // re-renders every second while live, for the elapsed clock
+  // One tab-switching function for the tabs and for buttons inside them ("Read the report",
+  // "open in Results"). useCallback keeps it the same function between renders unless
+  // `live` changes, so ReportView can build its Markdown elements once (see useMemo there).
+  const openTab = useCallback((tab: TabId) => setChoice({ tab, live }), [live])
+  const showResults = useCallback(() => openTab('results'), [openTab])
 
   if (loadError) {
     return (
-      <div className="px-9 pt-8">
+      <div className="px-4 pt-8 min-[760px]:px-9">
         <section className="rounded-[28px] bg-card p-6 shadow-card">
           <p role="alert" className="m-0 text-bad-fg">{loadError}</p>
           <Link to="/" className="mt-3 inline-block text-sm font-semibold text-accent-fg">
@@ -85,6 +91,7 @@ function RunView({ runId }: { runId: string }) {
     { id: 'results', label: 'Results', disabled: !resultsReady },
     { id: 'steps', label: 'Steps', count: events.length },
     { id: 'report', label: 'Report', disabled: !resultsReady || !summary?.report_markdown },
+    { id: 'code', label: 'Feature code', disabled: !resultsReady || !summary?.fe_code },
   ]
   // A choice made while the run was live expires when it ends, so the page moves to Results
   // by itself -- without an effect that sets state after every render.
@@ -101,7 +108,7 @@ function RunView({ runId }: { runId: string }) {
     })
 
   return (
-    <div className="flex max-w-[1180px] flex-col gap-6 px-9 pt-8 pb-16">
+    <div className="flex max-w-[1180px] flex-col gap-6 px-4 pt-8 pb-16 min-[760px]:px-9">
       <RunHeader
         dataset={summary?.dataset ?? runId}
         description={summary?.description ?? null}
@@ -120,30 +127,21 @@ function RunView({ runId }: { runId: string }) {
         </p>
       )}
 
-      <RunTabs tabs={tabs} active={tab} onSelect={(id) => setChoice({ tab: id, live })} />
+      <RunTabs tabs={tabs} active={tab} onSelect={openTab} />
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="flex flex-col gap-6">
         {tab === 'steps' && (
           <Timeline events={events} live={live} startIso={startIso} open={open} onToggle={toggle} />
         )}
         {tab === 'results' && summary && (
-          <ResultsTab summary={summary} onOpenReport={() => setChoice({ tab: 'report', live })} />
+          <ResultsTab summary={summary} onOpenReport={() => openTab('report')} />
         )}
         {tab === 'report' && summary?.report_markdown && (
-          <Card title="Report">
-            <ReportView markdown={summary.report_markdown} />
-          </Card>
+          <section aria-label="Report" className="rounded-[28px] bg-card px-5 py-7 shadow-card min-[760px]:px-11 min-[760px]:py-9">
+            <ReportView markdown={summary.report_markdown} onOpenLeaderboard={showResults} />
+          </section>
         )}
+        {tab === 'code' && summary?.fe_code && <CodeView code={summary.fe_code} tag={codeTag(events, outcome)} />}
       </div>
     </div>
-  )
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  // `children` is whatever is written between <Card> and </Card>.
-  return (
-    <section className="rounded-[28px] bg-card p-6 shadow-card" aria-label={title}>
-      <h3 className="mt-0 mb-4 text-base font-semibold">{title}</h3>
-      {children}
-    </section>
   )
 }

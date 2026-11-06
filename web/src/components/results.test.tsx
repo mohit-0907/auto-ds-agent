@@ -61,6 +61,7 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     leaderboard: MPG,
     selection: SELECTION,
     report_markdown: '# Report',
+    fe_code: null,
     token_cost_usd: 0.0231,
     warnings: [],
     error: null,
@@ -197,11 +198,34 @@ describe('Leaderboard', () => {
 })
 
 describe('ReportView', () => {
-  it('renders headings and GitHub-style tables', () => {
-    render(<ReportView markdown={'## Leaderboard\n\n| Model | RMSE |\n|---|---|\n| HGB | 2,811 |\n'} />)
+  const REPORT = [
+    '# Run report: mpg.csv',
+    '_Generated 2026-10-17 06:19 by auto-ds-agent._',
+    '## Summary',
+    'Hist Gradient Boosting is recommended, with target `mpg`.',
+    '- Small dataset.',
+    '## Leaderboard',
+    '| Model | RMSE |\n|---|---|\n| HGB | 2,811 |',
+  ].join('\n\n')
 
-    expect(screen.getByRole('heading', { name: 'Leaderboard' })).toBeInTheDocument()
-    expect(screen.getByRole('table')).toHaveTextContent('2,811')
+  it('drops the title, shows the generated line as meta, and styles the sections', () => {
+    render(<ReportView markdown={REPORT} onOpenLeaderboard={() => {}} />)
+
+    // The page header already names the run, so the report's own h1 is not drawn.
+    expect(screen.queryByRole('heading', { name: 'Run report: mpg.csv' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Generated 2026-10-17/).closest('p')).toHaveClass('text-muted', 'italic')
+    expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toHaveClass('font-display')
+    expect(screen.getByText('mpg')).toHaveClass('font-mono')
+    expect(screen.getByRole('listitem')).toHaveTextContent('Small dataset.')
+  })
+
+  it('replaces the leaderboard table with a button to the Results tab', async () => {
+    const onOpenLeaderboard = vi.fn()
+    render(<ReportView markdown={REPORT} onOpenLeaderboard={onOpenLeaderboard} />)
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: /Leaderboard table — open in Results/ }))
+    expect(onOpenLeaderboard).toHaveBeenCalledOnce()
   })
 
   it('never runs HTML hidden in the LLM-written report (XSS)', () => {
@@ -211,7 +235,7 @@ describe('ReportView', () => {
       '<img src="x" onerror="window.hacked = true">',
       '[click me](javascript:window.hacked=true)',
     ].join('\n\n')
-    const { container } = render(<ReportView markdown={hostile} />)
+    const { container } = render(<ReportView markdown={hostile} onOpenLeaderboard={() => {}} />)
 
     expect(container.querySelector('script')).toBeNull()
     expect(container.querySelector('img')).toBeNull()

@@ -9,7 +9,7 @@ export function NewRunPage() {
 
   return (
     // Two columns that wrap: the aside drops below the form on narrow screens.
-    <div className="flex max-w-[1080px] flex-wrap items-start gap-10 px-9 pt-10 pb-16">
+    <div className="flex max-w-[1080px] flex-wrap items-start gap-10 px-4 pt-10 pb-16 min-[760px]:px-9">
       <div className="min-w-0 flex-[1_1_420px]">
         <h1 className="mt-0 mb-2 font-display text-4xl font-normal tracking-[-0.015em]">
           Start a new run

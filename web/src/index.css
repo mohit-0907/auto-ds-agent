@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 
 /*
   Design tokens ("Organic" system, docs/design_handoff_auto_ds_agent_ui/README.md).

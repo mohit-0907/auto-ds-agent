@@ -50,6 +50,15 @@ def test_summary_lists_exactly_the_downloadable_files(client: TestClient) -> Non
     assert summary["downloads"][0] == {"name": "report.md", "size_bytes": 13}
 
 
+def test_summary_carries_the_feature_code(client: TestClient, tmp_path: Path) -> None:
+    summary = client.get(f"/api/runs/{RUN_ID}").json()
+    assert summary["fe_code"] == "def engineer_features(df, t):\n    return df\n"
+
+    # No model, no artifacts: a run that stopped early has no feature code to show.
+    (tmp_path / "runs" / RUN_ID / "fe_code.py").unlink()
+    assert client.get(f"/api/runs/{RUN_ID}").json()["fe_code"] is None
+
+
 def test_a_run_saved_before_selection_existed_has_none(client: TestClient) -> None:
     # This run.json has no "selection" key, like every run from before Task 7.8.
     assert client.get(f"/api/runs/{RUN_ID}").json()["selection"] is None
