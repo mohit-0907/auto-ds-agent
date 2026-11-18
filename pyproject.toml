@@ -27,12 +27,14 @@ dependencies = [
 #   Phase 4  uv add langgraph  (done)
 #   Phase 5  uv add scikit-learn xgboost lightgbm joblib  (done)
 #   Phase 6  uv add typer  (done)
-#   Phase 7  uv add streamlit
+#   Phase 7  uv add fastapi uvicorn python-multipart  (done; was Streamlit until 2026-10-17)
+#   Phase 8  uv add --dev pytest-cov  (done)
 
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
     "pytest>=8.2",
+    "pytest-cov>=7.1.0",
     "ruff>=0.5",
 ]
 
@@ -66,3 +68,15 @@ convention = "google"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+# `uv run pytest --cov` (CI runs it; locally it is opt-in, plain pytest stays fast).
+[tool.coverage.run]
+source = ["autods"]
+
+[tool.coverage.report]
+# PROJECT_PLAN Phase 8 asks for >= 60% on non-LLM modules; measured 95% (2026-11-18).
+# sandbox/_runner.py reads ~19%: it runs inside the sandbox subprocess, whose environment
+# is stripped on purpose, so coverage cannot follow it there. The executor tests run it.
+fail_under = 60
+show_missing = true
+skip_covered = true

@@ -17,6 +17,8 @@ venv/
 
 # Tooling caches
 .pytest_cache/
+.coverage
+htmlcov/
 .ruff_cache/
 .mypy_cache/
 .ipynb_checkpoints/
