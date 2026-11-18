@@ -14,7 +14,7 @@ import structlog
 
 from autods.arena.candidates import candidates
 from autods.arena.scoring import evaluate_candidate, make_cv, prepare_xy
-from autods.arena.selection import rank, select_best
+from autods.arena.selection import explain_selection, rank, select_best
 from autods.state import AgentState, ModelResult
 
 log = structlog.get_logger(__name__)
@@ -62,7 +62,8 @@ def arena_node(state: AgentState) -> dict[str, Any]:
             run_dir.
 
     Returns:
-        leaderboard (ranked ModelResults), best_model_id, and warnings; writes
+        leaderboard (ranked ModelResults), best_model_id, selection (the evidence
+        behind the choice), and warnings; writes
         run_dir/leaderboard.csv. An empty dict when there is nothing to train on.
 
     Raises:
@@ -82,6 +83,7 @@ def arena_node(state: AgentState) -> dict[str, Any]:
         return {
             "leaderboard": [],
             "best_model_id": None,
+            "selection": None,
             "warnings": [*warnings, f"Arena could not cross-validate: {exc}"],
         }
 
@@ -107,5 +109,6 @@ def arena_node(state: AgentState) -> dict[str, Any]:
     return {
         "leaderboard": ranked,
         "best_model_id": best_model_id,
+        "selection": explain_selection(results, best_model_id),
         "warnings": warnings + failed + notes,
     }

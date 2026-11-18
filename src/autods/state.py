@@ -210,6 +210,58 @@ class ModelResult(BaseModel):
     error: str | None = Field(default=None, description="Failure message when status is 'failed'.")
 
 
+class PairComparison(BaseModel):
+    """The selection rule's test applied to the chosen model and one other model.
+
+    The test always asks the same question: did the model with the better mean
+    win enough of the shared folds to rule out luck? ``folds_won`` counts folds
+    for that better-mean side, whichever of the two it is.
+    """
+
+    model_id: str = Field(description="The other model.")
+    model_name: str
+    better_mean: bool = Field(description="True if the other model's mean beat the chosen one's.")
+    folds_won: int = Field(ge=0, description="Folds won by the better-mean model of the pair.")
+    clearly: bool = Field(
+        description="Whether the better-mean model clearly beat the other (enough folds AND "
+        "a better mean), the same test select_best applies."
+    )
+    tested: bool = Field(
+        description="Whether select_best itself ran this comparison. It only tests the "
+        "top-mean model against simpler ones; the other rows are shown for context."
+    )
+
+
+class BaselineLift(BaseModel):
+    """How much better the chosen model is than the dummy baseline, on the primary metric."""
+
+    baseline_name: str
+    baseline_score: float
+    kind: Literal["difference", "percent"] = Field(
+        description="'difference' (chosen minus baseline) for higher-is-better metrics; "
+        "'percent' (error reduction) for error metrics such as RMSE."
+    )
+    value: float
+
+
+class Selection(BaseModel):
+    """Why the arena chose its model: the data behind the 'Why this model' panel.
+
+    Recorded by the arena at decision time and saved in run.json, so a run's
+    explanation never changes if the rule's settings change later.
+    """
+
+    chosen_model_id: str
+    top_model_id: str = Field(description="The model with the best mean primary metric.")
+    n_folds: int
+    min_fold_wins: int = Field(description="Folds a model must win to clearly beat another.")
+    comparisons: list[PairComparison] = Field(
+        description="The chosen model against every other successful non-baseline model, "
+        "in leaderboard order."
+    )
+    baseline: BaselineLift | None = None
+
+
 class AgentState(TypedDict):
     """The single channel between graph nodes.
 
@@ -246,6 +298,7 @@ class AgentState(TypedDict):
     processed_data_path: str | None
     leaderboard: list[ModelResult]
     best_model_id: str | None
+    selection: Selection | None  # why best_model_id won; None when no model was chosen
     report: str | None
 
     # Bookkeeping

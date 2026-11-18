@@ -192,6 +192,7 @@ def run_record(state: AgentState) -> dict[str, Any]:
         },
         "leaderboard": [r.model_dump() for r in state["leaderboard"]],
         "best_model_id": state["best_model_id"],
+        "selection": None if state["selection"] is None else state["selection"].model_dump(),
         "warnings": state["warnings"],
         "token_cost_usd": round(state["token_cost_usd"], 6),
         "artifacts": sorted(p.name for p in run_dir.iterdir()) if run_dir.is_dir() else [],

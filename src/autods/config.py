@@ -24,6 +24,8 @@ PACKAGE_ROOT = Path(__file__).parent
 PROJECT_ROOT = PACKAGE_ROOT.parent.parent
 PROMPTS_DIR = PACKAGE_ROOT / "prompts"
 RUNS_DIR = PROJECT_ROOT / "runs"
+# The built React app (`cd web && npm run build`). `autods serve` serves it next to the API.
+WEB_DIST_DIR = PROJECT_ROOT / "web" / "dist"
 
 # --- Models ----------------------------------------------------------------
 # Model strings are "<provider>:<model-id>"; autods.llm.get_llm dispatches on the
@@ -109,6 +111,52 @@ LEAKAGE_CORRELATION_THRESHOLD = 0.99  # A new column this correlated with the ta
 # Ceiling on feature columns the generated code may return; catches one-hot
 # encoding of a high-cardinality column exploding the frame.
 MAX_FE_COLUMNS = 500
+
+# --- Web API ---------------------------------------------------------------
+
+DATASETS_DIR = PROJECT_ROOT / "datasets"
+# Datasets the web app offers as one-click samples, so someone without a CSV at hand can
+# try the agent. Only these names can be started as a sample (an allowlist, like
+# downloads). An empty target means the agent infers it -- shown on purpose for penguins.
+SAMPLE_DATASETS: tuple[dict[str, str], ...] = (
+    {
+        "file": "Titanic-Dataset.csv",
+        "kind": "binary",
+        "description": "Predict which passengers survived",
+        "target": "Survived",
+    },
+    {
+        "file": "penguins.csv",
+        "kind": "multiclass",
+        "description": "Classify the penguin species",
+        "target": "",
+    },
+    {
+        "file": "mpg.csv",
+        "kind": "regression",
+        "description": "Predict a car's fuel efficiency",
+        "target": "mpg",
+    },
+    {
+        "file": "ames_train.csv",
+        "kind": "regression",
+        "description": "Predict the house sale price",
+        "target": "SalePrice",
+    },
+)
+
+# How often an open live-events stream checks for new stage events. Stages take
+# seconds, so a quarter-second delay is invisible.
+SSE_POLL_INTERVAL_S = 0.25
+# A comment line sent on a quiet stream, so proxies and browsers do not drop
+# a connection that waits a long time (the arena can be quiet for a while).
+SSE_KEEPALIVE_S = 15.0
+
+# Each stage event carries an expandable detail (generated code, a traceback, the
+# router's decision). Capped so one event stays small in events.jsonl and on the wire;
+# 12k characters fits a full generated feature file with room to spare.
+EVENT_DETAIL_MAX_CHARS = 12_000
+EVENT_DETAIL_PROFILE_COLUMNS = 8  # columns listed in the profiler step's detail
 
 # --- Profiler --------------------------------------------------------------
 

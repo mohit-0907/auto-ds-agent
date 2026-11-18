@@ -1,0 +1,54 @@
+# CI: the same checks as CLAUDE.md asks for before every task, on every push.
+# Two independent jobs, so a frontend failure never hides a Python one (or the reverse).
+# No secrets: every LLM call in the tests is scripted, so no API key and no network to OpenAI.
+
+name: CI
+
+on:
+  push: # every branch, so work on phase-* branches is checked before it reaches main
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read # read the code; nothing else
+
+concurrency:
+  # A newer push to the same branch makes the older, still-running check pointless.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python · ruff + pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # the suite takes ~3 min; a hang must not burn an hour
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true # reuse downloaded packages between runs, keyed on uv.lock
+      # --locked: fail if uv.lock is out of date with pyproject.toml instead of quietly
+      # resolving new versions. Python 3.12 comes from .python-version.
+      - run: uv sync --locked
+      - run: uv run ruff check src/ tests/
+      - run: uv run ruff format --check src/ tests/
+      - run: uv run pytest --cov # fails below the coverage floor in pyproject.toml
+
+  web:
+    name: Web · lint + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22 # the README's minimum major (22.12+): CI proves it is enough
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci # exactly what package-lock.json says, from a clean node_modules
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build

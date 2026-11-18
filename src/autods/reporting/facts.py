@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from autods.arena.scoring import LOWER_IS_BETTER
-from autods.arena.selection import BASELINE_ID, fold_wins
+from autods.arena.selection import BASELINE_ID, baseline_lift, fold_wins
 from autods.state import AgentState, ModelResult
 
 METRIC_LABELS = {
@@ -106,19 +106,16 @@ def _arena_facts(leaderboard: list[ModelResult], best_model_id: str | None) -> l
             "was chosen."
         )
 
+    # The same lift the web app shows, from the same function, so the two never disagree.
+    lift = baseline_lift(leaderboard, best.model_id)
     baseline = ok.get(BASELINE_ID)
     if baseline is not None:
-        base, value = baseline.metrics[metric], best.metrics[metric]
-        if lower and base > 0:
-            facts.append(
-                f"- Baseline ({baseline.model_name}): {label} {fmt(base)}. The best model's "
-                f"{label} is {100 * (base - value) / base:.1f}% lower than the baseline's."
-            )
-        else:
-            facts.append(
-                f"- Baseline ({baseline.model_name}): {label} {fmt(base)}. The best model is "
-                f"{fmt(value - base)} higher."
-            )
+        line = f"- Baseline ({baseline.model_name}): {label} {fmt(baseline.metrics[metric])}."
+        if lift is not None and lift.kind == "percent":
+            line += f" The best model's {label} is {lift.value:.1f}% lower than the baseline's."
+        elif lift is not None:
+            line += f" The best model is {fmt(lift.value)} higher."
+        facts.append(line)
 
     for other in ok.values():
         if other.model_id in {best.model_id, BASELINE_ID}:

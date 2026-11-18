@@ -86,7 +86,7 @@ class AgentState(TypedDict):
 - Task types: `binary_classification`, `multiclass_classification`, `regression`
 - A refusal path: `unsupported` (time series, text-heavy, image paths, unlabeled)
 - 5–6 candidate models with cross-validation, no heavy HPO
-- CLI first, Streamlit UI second
+- CLI first, then a web app (FastAPI backend + React frontend) that streams the agent live
 
 ### Explicitly out of scope (v1) — write this in your README
 - Deep learning, NLP, computer vision
@@ -109,8 +109,9 @@ Scope discipline is a CV signal. An honest "here's what it doesn't do" section r
 | ML | scikit-learn, xgboost, lightgbm |
 | Data | pandas, pyarrow |
 | Sandbox | `subprocess` + `resource` limits + timeout |
-| UI | Streamlit |
-| Tests | pytest |
+| Web backend | FastAPI, Server-Sent Events for live progress, uvicorn |
+| Web frontend | React + TypeScript, built with Vite |
+| Tests | pytest (Python); Vitest + React Testing Library (frontend) |
 | Env | `uv` (or poetry), `.env` via python-dotenv |
 | Logging | `structlog` or stdlib logging with JSON formatter |
 
@@ -139,8 +140,9 @@ auto-ds-agent/
 │   │   ├── executor.py     # [Phase 3]
 │   │   └── contract.py     # the function signature LLM code must satisfy
 │   ├── prompts/            # .md or .txt files, NOT inline strings
-│   └── cli.py              # [Phase 6]
-├── app/streamlit_app.py    # [Phase 7]
+│   ├── cli.py              # [Phase 6]
+│   └── api/                # FastAPI app: thin HTTP layer over the graph  [Phase 7]
+├── web/                    # React + TypeScript frontend (Vite)            [Phase 7]
 ├── tests/
 ├── datasets/               # small public CSVs for eval
 └── runs/                   # gitignored artifacts
@@ -269,22 +271,60 @@ CLI: `autods run data.csv --description "..." --target price`
 
 ---
 
-### Phase 7 — Streamlit UI · ~3h
-Upload → description box → live stage progress → leaderboard table → report → download buttons for the pipeline and the generated FE code.
+### Phase 7 — Web app: FastAPI backend + React frontend · ~22h (incl. redesign)
+*Changed from Streamlit on 2026-10-17: a full-stack app (agent + REST API + live streaming + React UI) is a stronger project than a Streamlit wrapper. Cost: ~4× the time, a second toolchain (Node), and a more involved Phase 8.*
 
-Stream the graph (`graph.stream()`) so stages appear as they complete. Watching the corrective loop retry live is the demo moment — make sure that's visible.
+Upload → description → live stage progress → leaderboard → report → downloads, as a React app talking to a FastAPI backend.
 
-**DoD:** a stranger can run it end-to-end without reading the code.
+```
+Browser (React, web/)                    Python (FastAPI, src/autods/api/)        Agent
+New-run form --POST /api/runs---------->  save upload, new_run_dir, start graph -> build_graph().stream()
+              (file, description, target)  in a background thread                  in a worker thread
+Live view   <-GET /api/runs/{id}/events--  one Server-Sent Event per finished node  <- node updates
+Results     --GET /api/runs/{id}-------->  leaderboard, best model, report.md
+Downloads   --GET /api/runs/{id}/files/{name}--> report.md, fe_code.py, best_pipeline.joblib, ...
+History     --GET /api/runs------------->  list of past run folders
+```
+
+Rules:
+- **The web layer is a thin caller of the graph**, exactly like the CLI: no agent logic in API routes, and the stage descriptions are shared with the CLI (one module, not two copies).
+- **The browser never talks to an LLM and never computes a metric.** Everything it shows comes from state or run artifacts.
+- **Server-Sent Events, not WebSockets:** progress only flows server → browser, SSE is plain HTTP with built-in reconnect, and it is easy to test.
+- **One process in production:** `uv run autods serve` serves the API and the built React app together. In development, Vite's dev server proxies `/api` to FastAPI.
+- **Uploads are validated at the API boundary** (extension, size) as well as by the profiler.
+- **One run at a time per server** (a second submission gets `409 Conflict`): v1 is a single-user tool, stated in the README's limitations.
+
+Watching the corrective loop retry live (attempt 1 ✗ → attempt 2 ✓) is the demo moment — make sure it is visible.
+
+Tasks:
+- **7.1** API skeleton: FastAPI app, upload + start a run in the background, run status and run list, shared progress module; API tests with the scripted LLM.
+- **7.2** Live events: the SSE endpoint fed by `graph.stream()`; tests.
+- **7.3** Frontend scaffold: Vite + React + TypeScript in `web/`, a typed API client, the new-run page (file drop, description, optional target).
+- **7.4** Live run view: consume the event stream; a stage timeline that shows retries.
+- **7.5** Results view: leaderboard table, rendered report, downloads, run history.
+
+*Redesign added on 2026-10-30 from `docs/design_handoff_auto_ds_agent_ui/` (high-fidelity, "Organic" design system: app shell with a run sidebar, light/dark theme, pipeline graph, tabs). Decisions: lift and fold verdicts are computed by the server, not the browser (invariant 9); fonts are bundled via @fontsource; a real samples endpoint lets a run start without an upload.*
+- **7.6** Design foundation + app shell + New run: tokens (light/dark) mapped into Tailwind, bundled fonts, `lucide-react` icons, theme toggle, sidebar run list, top bar, status-tag mapping, restyled New run screen with the "What the agent does" aside and sample datasets (`GET /api/samples`, start a run from a sample).
+- **7.7** Run screen: header chips, pipeline graph (pure, tested graph-state function), tabs, Steps tab with expandable rows and attempt groups; backend: per-event `detail`.
+- **7.8** (split: 7.8a backend, 7.8b UI) Results tab + failure states: recommendation card, "why this model" fold squares, artifacts with sizes, leaderboard with fold dots, warnings strip, no-model and fallback states; backend: `selection` + lift + file sizes in `RunSummary`.
+- **7.9** Report tab, Feature code tab, All runs page (search + status filter), narrow-screen sidebar drawer; backend: richer `RunListItem`.
+- **7.10** Production serve + DoD: `autods serve` serves the built frontend (SPA fallback); walkthrough on a never-seen CSV.
+
+New dependencies: `fastapi`, `uvicorn`, `python-multipart` (Python); `react`, `react-dom`, `react-router`, `vite`, `typescript`, Tailwind, `react-markdown` + `remark-gfm` + `@tailwindcss/typography`, `vitest` + `@testing-library/react` (Node); for the redesign `lucide-react` and `@fontsource/*`.
+
+The developer is new to React: frontend tasks explain each concept as it appears (components, props, state, hooks, effects) and trace every request from button click to the agent and back.
+
+**DoD:** `uv run autods serve` → browser → upload a never-seen CSV → watch every stage live, including a retry when one happens → leaderboard and report → download the artifacts. A stranger can do this without reading the code. API tests and frontend tests green; `npm run build` clean.
 
 ---
 
-### Phase 8 — Hardening & presentation · ~4h
+### Phase 8 — Hardening & presentation · ~5h
 - pytest suite with LLM calls mocked; ≥ 60% coverage on non-LLM modules
-- GitHub Actions running lint + tests
-- README: architecture diagram, 60-second demo GIF, honest limitations section, "why LLM-for-judgment-only"
-- Dockerfile (optional, but it's what makes the sandbox claim real)
+- GitHub Actions with two jobs: Python (ruff + pytest) and web (`npm ci`, lint, test, build)
+- README: architecture diagram, 60-second demo GIF of the React app running a live run, honest limitations section, "why LLM-for-judgment-only"
+- Dockerfile, multi-stage: a Node stage builds `web/`, a Python stage runs `autods serve` (and is what makes the sandbox claim real)
 
-**DoD:** clone → `docker run` (or `uv sync && autods run`) → working, no hand-holding.
+**DoD:** clone → `docker run` (or `uv sync && autods serve`) → working web app, no hand-holding.
 
 ---
 
@@ -304,26 +344,27 @@ Put this table in the README with your real numbers. Including the ones that dis
 
 ---
 
-## 8. Suggested schedule (~30h)
+## 8. Suggested schedule (~40h)
 
 | Week | Phases |
 |---|---|
 | 1 | 0, 1, 2 — foundations and first LLM node |
 | 2 | 3, 4 — codegen, sandbox, corrective loop |
 | 3 | 5, 6 — arena and reporting; end-to-end works |
-| 4 | 7, 8 — UI, tests, README, demo |
+| 4 | 7 — web app (FastAPI + React) |
+| 5 | 8 — CI, Docker, README, demo |
 
 ---
 
 ## 9. Stretch goals (only after Phase 8 is green)
 
-Time-series support · SHAP explanations in the report · Optuna HPO · FastAPI + Docker deploy · human-in-the-loop approval before FE runs (LangGraph `interrupt`) · caching profiles/decisions by dataset hash
+Time-series support · SHAP explanations in the report · Optuna HPO · cloud deploy of the Phase 7–8 web app · multi-user job queue · human-in-the-loop approval before FE runs (LangGraph `interrupt`) · caching profiles/decisions by dataset hash
 
 ---
 
 ## 10. CV framing
 
-> **Autonomous Data Science Agent** — LangGraph agent that profiles a tabular dataset, infers the ML task type, generates and self-repairs feature engineering code in a sandboxed executor (3-attempt corrective loop with graceful fallback), benchmarks 6 model families under cross-validation, and produces a justified recommendation. Architected so the LLM handles judgment while all metrics and training remain deterministic. Router accuracy 9/10 on a held-out eval set; 92% FE success within 3 attempts.
+> **Autonomous Data Science Agent** — LangGraph agent that profiles a tabular dataset, infers the ML task type, generates and self-repairs feature engineering code in a sandboxed executor (3-attempt corrective loop with graceful fallback), benchmarks 6 model families under cross-validation, and produces a justified, number-verified recommendation — via a CLI and a React + FastAPI web app that streams the agent's progress live over Server-Sent Events. Architected so the LLM handles judgment while all metrics and training remain deterministic. Router accuracy 9/10 on a held-out eval set; 92% FE success within 3 attempts.
 
 Interview questions this project earns you, and which you must be able to answer:
 1. Why keep the LLM out of the training loop?

@@ -10,7 +10,7 @@ task routing, feature-engineering codegen, and the final report.
 
 Status: **Phase 6 of 8 — one command takes a CSV to a written, number-verified report**
 (profiling, task routing, self-repairing feature engineering, fallback, cross-validated
-model arena, report, saved model). A Streamlit UI (Phase 7) is next.
+model arena, report, saved model). A web app (FastAPI + React, Phase 7) is next.
 
 See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
 
@@ -55,13 +55,44 @@ Each run gets its own folder under `runs/` with `report.md`, `leaderboard.csv`,
 (otherwise it is inferred); `--verbose` shows detailed logs. Exit codes: `0` a model was
 recommended, `2` bad command line, `3` the run ended without a model (the report says why).
 
+## Web app
+
+The same agent with a browser interface: upload a table, watch every stage live
+(including the feature-code retries), then read the leaderboard and report and download
+the artifacts.
+
+```bash
+uv sync
+cp .env.example .env                       # then set OPENAI_API_KEY
+cd web && npm install && npm run build && cd ..   # once; needs Node.js 22.12+
+uv run autods serve                        # then open http://127.0.0.1:8000
+```
+
+1. **New run:** drop a CSV or Parquet file (or pick a sample dataset), say in words what
+   to predict, and optionally name the target column. Click **Start run**.
+2. **Steps:** each stage appears as it finishes. Click a step to see what it produced:
+   the router's decision, the generated feature code, a sandbox error and the retry.
+3. **Results:** the recommended model, how far it beats the baseline, the fold-by-fold
+   evidence for choosing it, the full leaderboard, and the files to download.
+4. **Report** and **Feature code** tabs hold the written report and the code the model's
+   features came from. **All runs** lists every past run, from the web app or the CLI.
+
+One run at a time: a second upload while a run is in progress is refused. For frontend
+development, run `npm run dev` in `web/` instead of building; it proxies `/api` to
+`autods serve` on port 8000.
+
 ## Development
 
 ```bash
 uv sync
-uv run pytest
-uv run ruff check src/ --fix
+uv run pytest                      # ~3 min; every LLM call is scripted, no API key needed
+uv run pytest --cov                # with coverage (fails below 60%)
+uv run ruff check src/ tests/ --fix
+cd web && npm run lint && npm run test && npm run build
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push: a Python job (ruff and
+pytest with coverage) and a web job (lint, test, build), with no secrets.
 
 ## Known limitations
 

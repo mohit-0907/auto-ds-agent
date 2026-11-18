@@ -5,6 +5,7 @@ description = "LangGraph agent that profiles a tabular dataset, infers the ML ta
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.143.3",
     "joblib>=1.6.0",
     "langchain-openai>=1.6.7",
     "langgraph>=1.2.14",
@@ -13,9 +14,11 @@ dependencies = [
     "pyarrow>=16.0",
     "pydantic>=2.7",
     "python-dotenv>=1.0",
+    "python-multipart>=0.0.32",
     "scikit-learn>=1.9.1",
     "structlog>=24.1",
     "typer>=0.27.3",
+    "uvicorn>=0.54.0",
     "xgboost>=3.2.0",
 ]
 
@@ -24,11 +27,14 @@ dependencies = [
 #   Phase 4  uv add langgraph  (done)
 #   Phase 5  uv add scikit-learn xgboost lightgbm joblib  (done)
 #   Phase 6  uv add typer  (done)
-#   Phase 7  uv add streamlit
+#   Phase 7  uv add fastapi uvicorn python-multipart  (done; was Streamlit until 2026-10-17)
+#   Phase 8  uv add --dev pytest-cov  (done)
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.2",
+    "pytest-cov>=7.1.0",
     "ruff>=0.5",
 ]
 
@@ -62,3 +68,15 @@ convention = "google"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+# `uv run pytest --cov` (CI runs it; locally it is opt-in, plain pytest stays fast).
+[tool.coverage.run]
+source = ["autods"]
+
+[tool.coverage.report]
+# PROJECT_PLAN Phase 8 asks for >= 60% on non-LLM modules; measured 95% (2026-11-18).
+# sandbox/_runner.py reads ~19%: it runs inside the sandbox subprocess, whose environment
+# is stripped on purpose, so coverage cannot follow it there. The executor tests run it.
+fail_under = 60
+show_missing = true
+skip_covered = true

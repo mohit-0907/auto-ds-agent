@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+html,body{margin:0;height:100%;background:var(--color-bg);}
+a{color:var(--accent-fg);}a:hover{color:var(--color-accent);}
+@keyframes adsSpin{to{transform:rotate(360deg)}}
+@keyframes adsPulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</helmet>
+<div style="display:grid;grid-template-columns:268px minmax(0,1fr);height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-size:14px;line-height:1.5;">
+
+<aside style="display:flex;flex-direction:column;min-height:0;background:var(--color-surface);border-right:1px solid var(--color-divider);">
+  <div style="display:flex;align-items:center;gap:10px;padding:20px 18px 16px;">
+    <span style="width:26px;height:26px;border-radius:50%;background:var(--color-accent);display:flex;align-items:center;justify-content:center;flex:none;"><span style="width:10px;height:10px;border-radius:50%;background:var(--color-surface);"></span></span>
+    <span style="font-family:var(--font-heading);font-size:19px;letter-spacing:-0.01em;">auto-ds-agent</span>
+  </div>
+  <div style="padding:0 14px 14px;">
+    <button onClick="{{ goNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border:none;border-radius:999px;background:var(--color-accent);color:var(--on-accent);font-family:var(--font-heading);font-size:14px;cursor:pointer;" style-hover="filter:brightness(0.93);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+      New run
+    </button>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 18px 6px;">
+    <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;">Runs</span>
+    <button onClick="{{ goHistory }}" style="border:none;background:transparent;color:var(--accent-fg);font:600 12px var(--font-body);cursor:pointer;padding:2px 6px;border-radius:999px;" style-hover="background:var(--ui-sel);">View all</button>
+  </div>
+  <nav style="flex:1;min-height:0;overflow:auto;padding:2px 10px 10px;display:flex;flex-direction:column;gap:2px;">
+    <sc-for list="{{ sideRuns }}" as="r" hint-placeholder-count="6">
+      <button onClick="{{ r.open }}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;cursor:pointer;padding:9px 10px;border-radius:14px;background:{{ r.bg }};color:var(--color-text);font-family:var(--font-body);" style-hover="background:var(--ui-sel);">
+        <span style="margin-top:6px;width:8px;height:8px;border-radius:50%;flex:none;background:{{ r.dot }};animation:{{ r.anim }};"></span>
+        <span style="min-width:0;flex:1;display:flex;flex-direction:column;">
+          <span style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.dataset }}</span>
+          <span style="font-size:12px;color:var(--ui-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.sub }}</span>
+        </span>
+        <span style="font-size:11px;color:var(--ui-muted);margin-top:2px;flex:none;">{{ r.ago }}</span>
+      </button>
+    </sc-for>
+  </nav>
+  <div style="padding:14px;border-top:1px solid var(--color-divider);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+    <span style="font-size:12px;color:var(--ui-muted);">Theme</span>
+    <div style="display:flex;border:1px solid var(--color-divider);border-radius:999px;padding:3px;gap:2px;">
+      <button onClick="{{ setLight }}" aria-label="Light theme" style="display:flex;align-items:center;gap:6px;border:none;cursor:pointer;padding:5px 10px;border-radius:999px;font:600 12px var(--font-body);background:{{ lightBg }};color:{{ lightFg }};">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>Light
+      </button>
+      <button onClick="{{ setDark }}" aria-label="Dark theme" style="display:flex;align-items:center;gap:6px;border:none;cursor:pointer;padding:5px 10px;border-radius:999px;font:600 12px var(--font-body);background:{{ darkBg }};color:{{ darkFg }};">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>Dark
+      </button>
+    </div>
+  </div>
+</aside>
+
+<main style="min-width:0;min-height:0;overflow:auto;">
+  <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:16px 36px;background:var(--color-bg);border-bottom:1px solid var(--color-divider);">
+    <span style="font-size:13px;color:var(--ui-muted);">{{ crumbRoot }}</span>
+    <sc-if value="{{ hasCrumb }}" hint-placeholder-val="{{ false }}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ui-muted)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+      <span style="font-size:13px;font-weight:600;">{{ crumbLeaf }}</span>
+    </sc-if>
+    <span style="flex:1;"></span>
+    <sc-if value="{{ isRunView }}" hint-placeholder-val="{{ false }}">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:{{ run.tagBg }};color:{{ run.tagFg }};">
+        <span style="width:7px;height:7px;border-radius:50%;background:{{ run.dot }};animation:{{ run.anim }};"></span>{{ run.statusLabel }}
+      </span>
+    </sc-if>
+  </div>
+
+  <!-- NEW RUN -->
+  <sc-if value="{{ isNew }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:40px 36px 64px;max-width:1080px;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;">
+    <div style="min-width:0;flex:1 1 420px;">
+      <h1 style="font-family:var(--font-heading);font-size:36px;margin:0 0 8px;letter-spacing:-0.015em;">Start a new run</h1>
+      <p style="margin:0 0 28px;color:var(--ui-muted);font-size:15px;max-width:54ch;text-wrap:pretty;">Upload a table and say what you want to predict. The agent profiles it, writes and repairs feature code, benchmarks six models and explains its pick.</p>
+
+      <div style="display:flex;flex-direction:column;gap:22px;background:var(--ui-card);border-radius:32px;padding:28px;box-shadow:var(--shadow-sm);">
+        <label onDragOver="{{ onDragOver }}" onDragLeave="{{ onDragLeave }}" onDrop="{{ onDrop }}" style="display:flex;align-items:center;gap:18px;cursor:pointer;padding:26px 24px;border-radius:24px;border:1.5px dashed {{ dropBorder }};background:{{ dropBg }};">
+          <input type="file" accept=".csv,.parquet,.pq" onChange="{{ onFile }}" style="position:absolute;opacity:0;width:0;height:0;" aria-label="Dataset file">
+          <span style="width:52px;height:52px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:{{ dropIconBg }};color:{{ dropIconFg }};">
+            <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+            </sc-if>
+            <sc-if value="{{ noFile }}" hint-placeholder-val="{{ true }}">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+            </sc-if>
+          </span>
+          <span style="display:flex;flex-direction:column;min-width:0;flex:1;">
+            <span style="font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ dropTitle }}</span>
+            <span style="font-size:13px;color:var(--ui-muted);">{{ dropSub }}</span>
+          </span>
+          <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ clearFile }}" aria-label="Remove file" style="flex:none;width:32px;height:32px;border-radius:50%;border:none;background:transparent;color:var(--ui-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;" style-hover="background:var(--ui-sel);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </button>
+          </sc-if>
+        </label>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label for="ads-desc" style="font-size:13px;font-weight:600;">What do you want to predict?</label>
+          <textarea id="ads-desc" rows="3" value="{{ description }}" onChange="{{ onDesc }}" placeholder="e.g. Predict which passengers survived" style="width:100%;resize:vertical;font:inherit;font-size:14px;padding:12px 16px;border-radius:20px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);caret-color:var(--color-accent);" style-focus="border-color:var(--color-accent);outline:none;"></textarea>
+          <span style="font-size:12px;color:var(--ui-muted);">Plain language. The agent uses it to choose the task and the target.</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label for="ads-target" style="font-size:13px;font-weight:600;">Target column <span style="font-weight:400;color:var(--ui-muted);">optional</span></label>
+          <input id="ads-target" value="{{ target }}" onChange="{{ onTarget }}" placeholder="Leave empty and the agent will work it out" style="width:100%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;padding:10px 16px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);caret-color:var(--color-accent);" style-focus="border-color:var(--color-accent);outline:none;">
+        </div>
+
+        <sc-if value="{{ formError }}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:16px;background:var(--bad-bg);color:var(--bad-fg);font-size:13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>{{ formError }}
+          </div>
+        </sc-if>
+
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <button onClick="{{ startRun }}" disabled="{{ cantSubmit }}" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border:none;border-radius:999px;background:var(--color-accent);color:var(--on-accent);font-family:var(--font-heading);font-size:15px;cursor:pointer;opacity:{{ submitOpacity }};" style-hover="filter:brightness(0.93);">
+            Start run
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </button>
+          <span style="font-size:12px;color:var(--ui-muted);">One run at a time · usually about a minute</span>
+        </div>
+      </div>
+
+      <div style="margin-top:28px;display:flex;flex-direction:column;gap:10px;">
+        <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;">Or try a sample dataset</span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <sc-for list="{{ samples }}" as="s" hint-placeholder-count="4">
+            <button onClick="{{ s.pick }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:9px 16px;border-radius:18px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);cursor:pointer;font-family:var(--font-body);text-align:left;" style-hover="background:var(--ui-sel);">
+              <span style="font-size:13px;font-weight:600;">{{ s.name }}</span>
+              <span style="font-size:11.5px;color:var(--ui-muted);">{{ s.meta }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <aside style="display:flex;flex-direction:column;gap:14px;padding-top:6px;flex:0 1 300px;min-width:260px;">
+      <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;">What the agent does</span>
+      <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;">
+        <sc-for list="{{ pipelineSteps }}" as="p" hint-placeholder-count="7">
+          <li style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:0 0 16px;position:relative;">
+            <span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 12px 'JetBrains Mono',monospace;background:{{ p.bg }};color:{{ p.fg }};">{{ p.n }}</span>
+            <span style="display:flex;flex-direction:column;padding-top:3px;">
+              <span style="font-size:13.5px;font-weight:600;">{{ p.label }} <span style="font-weight:500;font-size:11px;color:{{ p.byFg }};margin-left:4px;">{{ p.by }}</span></span>
+              <span style="font-size:12.5px;color:var(--ui-muted);text-wrap:pretty;">{{ p.text }}</span>
+            </span>
+          </li>
+        </sc-for>
+      </ol>
+      <p style="margin:0;font-size:12px;color:var(--ui-muted);text-wrap:pretty;">The LLM makes three judgments. Every metric, statistic and training run is plain Python.</p>
+    </aside>
+  </div>
+  </sc-if>
+
+  <!-- RUN -->
+  <sc-if value="{{ isRunView }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:32px 36px 64px;max-width:1180px;display:flex;flex-direction:column;gap:24px;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+      <div style="min-width:0;display:flex;flex-direction:column;gap:6px;">
+        <h1 style="font-family:var(--font-heading);font-size:32px;margin:0;letter-spacing:-0.015em;overflow-wrap:anywhere;">{{ run.dataset }}</h1>
+        <p style="margin:0;color:var(--ui-muted);font-size:15px;">“{{ run.description }}”</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+          <sc-for list="{{ run.chips }}" as="c" hint-placeholder-count="4">
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;border:1px solid var(--color-divider);font-size:12px;"><span style="color:var(--ui-muted);">{{ c.k }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;">{{ c.v }}</span></span>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ run.isLive }}" hint-placeholder-val="{{ false }}">
+        <span style="font:500 13px 'JetBrains Mono',monospace;color:var(--ui-muted);">elapsed {{ run.elapsed }}</span>
+      </sc-if>
+      <sc-if value="{{ run.canReplay }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ replay }}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);font:600 12.5px var(--font-body);cursor:pointer;" style-hover="background:var(--ui-sel);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>Replay live stream
+        </button>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showGraph }}" hint-placeholder-val="{{ true }}">
+    <section style="background:var(--ui-card);border-radius:28px;padding:20px 24px 22px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;">Pipeline</span>
+        <span style="font-size:12px;color:var(--ui-muted);">{{ graphCaption }}</span>
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;row-gap:14px;">
+        <sc-for list="{{ graph }}" as="g" hint-placeholder-count="6"><span style="display:inline-flex;align-items:center;">
+          <sc-if value="{{ g.connector }}" hint-placeholder-val="{{ false }}">
+            <span style="width:22px;height:2px;border-radius:2px;background:{{ g.lineColor }};flex:none;margin-left:-2px;"></span>
+          </sc-if>
+          <sc-if value="{{ g.isNode }}" hint-placeholder-val="{{ true }}">
+            <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;background:{{ g.bg }};color:{{ g.fg }};border:1.5px {{ g.borderStyle }} {{ g.border }};opacity:{{ g.opacity }};">
+              <sc-if value="{{ g.isDone }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+              <sc-if value="{{ g.isFail }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></sc-if>
+              <sc-if value="{{ g.isActive }}" hint-placeholder-val="{{ false }}">{{ spinnerSm }}</sc-if>
+              {{ g.label }}
+            </span>
+          </sc-if>
+          <sc-if value="{{ g.isLoop }}" hint-placeholder-val="{{ false }}">
+            <span style="display:inline-flex;flex-direction:column;gap:8px;padding:10px 12px 10px;border-radius:24px;border:1.5px dashed var(--color-divider);">
+              <span style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--ui-muted);"><span style="font-weight:600;">Corrective loop</span><span style="font-family:'JetBrains Mono',monospace;">{{ g.caption }}</span></span>
+              <span style="display:flex;align-items:center;gap:6px;">
+                <sc-for list="{{ g.nodes }}" as="n" hint-placeholder-count="2">
+                  <sc-if value="{{ n.connector }}" hint-placeholder-val="{{ false }}">
+                    <svg width="18" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ui-muted)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"></path><path d="M20 7H4"></path><path d="m8 21-4-4 4-4"></path><path d="M4 17h16"></path></svg>
+                  </sc-if>
+                  <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;background:{{ n.bg }};color:{{ n.fg }};border:1.5px {{ n.borderStyle }} {{ n.border }};opacity:{{ n.opacity }};">
+                    <sc-if value="{{ n.isDone }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                    <sc-if value="{{ n.isFail }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></sc-if>
+                    <sc-if value="{{ n.isActive }}" hint-placeholder-val="{{ false }}">{{ spinnerSm }}</sc-if>
+                    {{ n.label }}
+                  </span>
+                </sc-for>
+              </span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ui-muted);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10 20 15 15 20"></path><path d="M4 4v7a4 4 0 0 0 4 4h12"></path></svg>
+                after 3 failures
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:600;background:{{ g.fb.bg }};color:{{ g.fb.fg }};border:1.5px {{ g.fb.borderStyle }} {{ g.fb.border }};opacity:{{ g.fb.opacity }};">Fallback features</span>
+              </span>
+            </span>
+          </sc-if>
+        </span></sc-for>
+      </div>
+    </section>
+    </sc-if>
+
+    <div style="display:flex;gap:4px;border-bottom:1px solid var(--color-divider);">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.onClick }}" disabled="{{ t.disabled }}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;margin-bottom:-1px;border:none;border-bottom:2px solid {{ t.line }};background:transparent;color:{{ t.fg }};font:600 13.5px var(--font-body);cursor:pointer;opacity:{{ t.opacity }};" style-hover="color:var(--color-text);">
+          {{ t.label }}<span style="font:500 11px 'JetBrains Mono',monospace;color:var(--ui-muted);">{{ t.count }}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <!-- RESULTS -->
+    <sc-if value="{{ tabResults }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ run.noModel }}" hint-placeholder-val="{{ false }}">
+        <section style="display:flex;gap:20px;align-items:flex-start;background:var(--ui-card);border-radius:28px;padding:28px;box-shadow:var(--shadow-sm);">
+          <span style="width:48px;height:48px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:var(--bad-bg);color:var(--bad-fg);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+          </span>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+            <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--bad-fg);font-weight:600;">Ended without a model</span>
+            <h2 style="font-family:var(--font-heading);font-size:24px;margin:0;">{{ run.noModelTitle }}</h2>
+            <p style="margin:0;color:var(--ui-muted);max-width:68ch;text-wrap:pretty;">{{ run.noModelText }}</p>
+            <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+              <button onClick="{{ goReport }}" style="padding:9px 18px;border-radius:999px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);font-family:var(--font-heading);font-size:14px;cursor:pointer;" style-hover="background:var(--ui-sel);">Read the report</button>
+              <button onClick="{{ goNew }}" style="padding:9px 18px;border-radius:999px;border:none;background:var(--color-accent);color:var(--on-accent);font-family:var(--font-heading);font-size:14px;cursor:pointer;" style-hover="filter:brightness(0.93);">Try another dataset</button>
+            </div>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ run.hasModel }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ run.hasWarnings }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:20px;background:var(--warn-bg);color:var(--warn-fg);">
+            <sc-for list="{{ run.warnings }}" as="w" hint-placeholder-count="1">
+              <span style="display:flex;gap:10px;align-items:flex-start;font-size:13px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>{{ w }}
+              </span>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;">
+          <section style="background:var(--ui-card);border-radius:28px;padding:26px 28px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent-fg);font-weight:600;">Recommended model</span>
+              <h2 style="font-family:var(--font-heading);font-size:30px;margin:0;">{{ run.bestName }}</h2>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap;">
+              <div style="display:flex;flex-direction:column;">
+                <span style="font:500 44px/1 'JetBrains Mono',monospace;letter-spacing:-0.03em;">{{ run.bestScore }}</span>
+                <span style="font-size:12.5px;color:var(--ui-muted);margin-top:6px;">{{ run.metricLabel }} <span style="font-family:'JetBrains Mono',monospace;">± {{ run.bestStd }}</span> · 5-fold CV</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:2px;">
+                <span style="font:500 15px 'JetBrains Mono',monospace;color:var(--ok-fg);">{{ run.liftText }}</span>
+                <span style="font-size:12.5px;color:var(--ui-muted);">{{ run.liftSub }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:16px;border-top:1px solid var(--color-divider);">
+              <span style="font-size:13px;font-weight:600;">Why this model</span>
+              <p style="margin:0;font-size:13.5px;color:var(--ui-muted);text-wrap:pretty;">{{ run.whyText }}</p>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                <sc-for list="{{ run.whyRows }}" as="w" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;font-size:13px;">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="color:var(--ui-muted);">vs</span> {{ w.vs }}</span>
+                    <span style="display:flex;gap:4px;">
+                      <sc-for list="{{ w.folds }}" as="f" hint-placeholder-count="5">
+                        <span style="width:12px;height:12px;border-radius:4px;background:{{ f.bg }};border:1.5px solid {{ f.border }};"></span>
+                      </sc-for>
+                    </span>
+                    <span style="font:500 12px 'JetBrains Mono',monospace;color:{{ w.fg }};min-width:92px;text-align:right;">{{ w.verdict }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:11.5px;color:var(--ui-muted);margin-top:4px;">Rule: a higher-scoring model must beat every simpler model on at least 4 of 5 folds, otherwise the simpler one wins.</span>
+            </div>
+          </section>
+
+          <section style="background:var(--ui-card);border-radius:28px;padding:22px 22px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:6px;">
+            <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:0 6px 6px;">Artifacts</span>
+            <sc-for list="{{ run.artifacts }}" as="a" hint-placeholder-count="4">
+              <button style="display:flex;align-items:center;gap:12px;width:100%;padding:10px 8px;border:none;border-radius:16px;background:transparent;color:var(--color-text);cursor:pointer;text-align:left;font-family:var(--font-body);" style-hover="background:var(--ui-sel);">
+                <span style="width:36px;height:36px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:var(--color-bg);color:var(--ui-muted);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+                </span>
+                <span style="display:flex;flex-direction:column;min-width:0;flex:1;">
+                  <span style="font:500 12.5px 'JetBrains Mono',monospace;">{{ a.name }}</span>
+                  <span style="font-size:12px;color:var(--ui-muted);">{{ a.desc }}</span>
+                </span>
+                <span style="font-size:11.5px;color:var(--ui-muted);">{{ a.size }}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-fg)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
+              </button>
+            </sc-for>
+            <div style="margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--color-divider);display:flex;justify-content:space-between;font-size:12px;color:var(--ui-muted);">
+              <span>LLM cost</span><span style="font-family:'JetBrains Mono',monospace;">{{ run.cost }}</span>
+            </div>
+          </section>
+        </div>
+
+        <section style="background:var(--ui-card);border-radius:28px;padding:22px 24px 12px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <h3 style="font-family:var(--font-heading);font-size:20px;margin:0;">Leaderboard</h3>
+            <span style="font-size:12px;color:var(--ui-muted);">Same 5 folds for every model · ranked by {{ run.metricLabel }}, {{ run.dirText }}</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:820px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:10px 8px;border-bottom:1px solid var(--color-divider);width:36px;">#</th>
+                  <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:10px 8px;border-bottom:1px solid var(--color-divider);">Model</th>
+                  <sc-for list="{{ run.metricHeads }}" as="h" hint-placeholder-count="3">
+                    <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:{{ h.fg }};font-weight:600;padding:10px 8px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">{{ h.label }}</th>
+                  </sc-for>
+                  <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:10px 8px 10px 20px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">Folds</th>
+                  <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:10px 8px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">Train s</th>
+                  <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:10px 8px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">Predict ms</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ run.board }}" as="b" hint-placeholder-count="6">
+                  <tr style="background:{{ b.bg }};">
+                    <td style="padding:11px 8px;border-bottom:1px solid var(--color-divider);font-family:'JetBrains Mono',monospace;color:var(--ui-muted);">{{ b.rank }}</td>
+                    <td style="padding:11px 8px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">
+                      <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-weight:{{ b.weight }};">{{ b.name }}</span>
+                        <sc-if value="{{ b.best }}" hint-placeholder-val="{{ false }}"><span style="padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;background:var(--ok-bg);color:var(--ok-fg);">selected</span></sc-if>
+                        <sc-if value="{{ b.baseline }}" hint-placeholder-val="{{ false }}"><span style="padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--color-divider);color:var(--ui-muted);">baseline</span></sc-if>
+                      </span>
+                    </td>
+                    <sc-for list="{{ b.cells }}" as="c" hint-placeholder-count="3">
+                      <td style="padding:11px 8px;border-bottom:1px solid var(--color-divider);text-align:right;white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:12.5px;"><span style="font-weight:{{ c.weight }};color:{{ c.fg }};">{{ c.mean }}</span> <span style="color:var(--ui-muted);font-size:11px;">±{{ c.std }}</span></td>
+                    </sc-for>
+                    <td style="padding:11px 8px 11px 20px;border-bottom:1px solid var(--color-divider);">
+                      <span style="position:relative;display:block;width:120px;height:14px;">
+                        <span style="position:absolute;left:0;right:0;top:6px;height:2px;border-radius:2px;background:var(--color-divider);"></span>
+                        <sc-for list="{{ b.dots }}" as="d" hint-placeholder-count="5">
+                          <span style="position:absolute;top:3px;left:{{ d.left }};width:8px;height:8px;margin-left:-4px;border-radius:50%;background:{{ d.bg }};opacity:0.85;"></span>
+                        </sc-for>
+                      </span>
+                    </td>
+                    <td style="padding:11px 8px;border-bottom:1px solid var(--color-divider);text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--ui-muted);">{{ b.train }}</td>
+                    <td style="padding:11px 8px;border-bottom:1px solid var(--color-divider);text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--ui-muted);">{{ b.predict }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <span style="font-size:11.5px;color:var(--ui-muted);padding:4px 0 6px;">Folds: each dot is one cross-validation fold on a shared scale ({{ run.scaleText }}); tighter clusters mean steadier models.</span>
+        </section>
+      </sc-if>
+    </sc-if>
+
+    <!-- STEPS -->
+    <sc-if value="{{ tabSteps }}" hint-placeholder-val="{{ false }}">
+      <section style="background:var(--ui-card);border-radius:28px;padding:14px 16px;box-shadow:var(--shadow-sm);">
+        <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;">
+          <sc-for list="{{ timeline }}" as="it" hint-placeholder-count="8">
+            <sc-if value="{{ it.isStage }}" hint-placeholder-val="{{ true }}">
+              <li style="display:flex;flex-direction:column;">
+                <button onClick="{{ it.row.toggle }}" style="display:grid;grid-template-columns:24px 150px minmax(0,1fr) auto 18px;gap:12px;align-items:center;width:100%;text-align:left;padding:9px 10px;border:none;border-radius:16px;background:transparent;color:var(--color-text);font-family:var(--font-body);font-size:13.5px;cursor:{{ it.row.cursor }};" style-hover="background:var(--ui-sel);">
+                  <span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ it.row.iconBg }};color:{{ it.row.iconFg }};">
+                    <sc-if value="{{ it.row.ok }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                    <sc-if value="{{ it.row.fail }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></sc-if>
+                    <sc-if value="{{ it.row.running }}" hint-placeholder-val="{{ false }}">{{ spinnerSm }}</sc-if>
+                  </span>
+                  <span style="font-weight:600;">{{ it.row.label }}</span>
+                  <span style="color:{{ it.row.textFg }};overflow-wrap:anywhere;">{{ it.row.text }}</span>
+                  <span style="font:500 12px 'JetBrains Mono',monospace;color:var(--ui-muted);">{{ it.row.t }}</span>
+                  <span style="color:var(--ui-muted);display:flex;transform:{{ it.row.chevron }};opacity:{{ it.row.chevOpacity }};"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </button>
+                <sc-if value="{{ it.row.showDetail }}" hint-placeholder-val="{{ false }}">
+                  <pre style="margin:4px 10px 10px 46px;padding:14px 16px;border-radius:16px;background:var(--ui-code);color:{{ it.row.detailFg }};font:12px/1.6 'JetBrains Mono',monospace;white-space:pre-wrap;overflow-x:auto;">{{ it.row.detail }}</pre>
+                </sc-if>
+              </li>
+            </sc-if>
+            <sc-if value="{{ it.isAttempt }}" hint-placeholder-val="{{ false }}">
+              <li style="margin:6px 0;padding:6px 6px 6px;border-radius:22px;border:1.5px solid {{ it.border }};background:var(--color-bg);">
+                <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 4px;">
+                  <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;color:var(--ui-muted);">Attempt {{ it.attempt }}</span>
+                  <span style="padding:1px 9px;border-radius:999px;font-size:11px;font-weight:600;background:{{ it.tagBg }};color:{{ it.tagFg }};">{{ it.status }}</span>
+                </div>
+                <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;">
+                  <sc-for list="{{ it.rows }}" as="row" hint-placeholder-count="2">
+                    <li style="display:flex;flex-direction:column;">
+                      <button onClick="{{ row.toggle }}" style="display:grid;grid-template-columns:24px 140px minmax(0,1fr) auto 18px;gap:12px;align-items:center;width:100%;text-align:left;padding:9px 10px;border:none;border-radius:16px;background:transparent;color:var(--color-text);font-family:var(--font-body);font-size:13.5px;cursor:{{ row.cursor }};" style-hover="background:var(--ui-sel);">
+                        <span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ row.iconBg }};color:{{ row.iconFg }};">
+                          <sc-if value="{{ row.ok }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                          <sc-if value="{{ row.fail }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></sc-if>
+                        </span>
+                        <span style="font-weight:600;">{{ row.label }}</span>
+                        <span style="color:{{ row.textFg }};overflow-wrap:anywhere;">{{ row.text }}</span>
+                        <span style="font:500 12px 'JetBrains Mono',monospace;color:var(--ui-muted);">{{ row.t }}</span>
+                        <span style="color:var(--ui-muted);display:flex;transform:{{ row.chevron }};opacity:{{ row.chevOpacity }};"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+                      </button>
+                      <sc-if value="{{ row.showDetail }}" hint-placeholder-val="{{ false }}">
+                        <pre style="margin:4px 10px 10px 46px;padding:14px 16px;border-radius:16px;background:var(--ui-code);color:{{ row.detailFg }};font:12px/1.6 'JetBrains Mono',monospace;white-space:pre-wrap;overflow-x:auto;">{{ row.detail }}</pre>
+                      </sc-if>
+                    </li>
+                  </sc-for>
+                </ol>
+              </li>
+            </sc-if>
+          </sc-for>
+        </ol>
+        <sc-if value="{{ run.isLive }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:6px 10px 6px;font-size:12px;color:var(--ui-muted);" aria-live="polite">Streaming live from the agent. Results appear here when the run finishes.</p>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <!-- REPORT -->
+    <sc-if value="{{ tabReport }}" hint-placeholder-val="{{ false }}">
+      <section style="background:var(--ui-card);border-radius:28px;padding:36px 44px 32px;box-shadow:var(--shadow-sm);">
+        <article style="max-width:720px;display:flex;flex-direction:column;">
+          <sc-for list="{{ reportBlocks }}" as="bl" hint-placeholder-count="10">
+            <sc-if value="{{ bl.isMeta }}" hint-placeholder-val="{{ false }}"><p style="margin:0 0 8px;font-size:12.5px;color:var(--ui-muted);font-style:italic;text-wrap:pretty;">{{ bl.text }}</p></sc-if>
+            <sc-if value="{{ bl.isH }}" hint-placeholder-val="{{ false }}"><h3 style="font-family:var(--font-heading);font-size:21px;margin:26px 0 8px;">{{ bl.text }}</h3></sc-if>
+            <sc-if value="{{ bl.isP }}" hint-placeholder-val="{{ true }}"><p style="margin:0 0 10px;font-size:14.5px;line-height:1.65;text-wrap:pretty;">{{ bl.text }}</p></sc-if>
+            <sc-if value="{{ bl.isLi }}" hint-placeholder-val="{{ false }}"><p style="margin:0 0 8px;font-size:14.5px;line-height:1.6;display:grid;grid-template-columns:18px 1fr;text-wrap:pretty;"><span style="color:var(--color-accent);">•</span><span>{{ bl.text }}</span></p></sc-if>
+            <sc-if value="{{ bl.isTable }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ goResults }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:8px;margin:4px 0 10px;padding:9px 16px;border-radius:999px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);font:600 13px var(--font-body);cursor:pointer;" style-hover="background:var(--ui-sel);">Leaderboard table — open in Results <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button>
+            </sc-if>
+          </sc-for>
+        </article>
+      </section>
+    </sc-if>
+
+    <!-- CODE -->
+    <sc-if value="{{ tabCode }}" hint-placeholder-val="{{ false }}">
+      <section style="background:var(--ui-card);border-radius:28px;box-shadow:var(--shadow-sm);overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--color-divider);flex-wrap:wrap;">
+          <span style="font:500 13px 'JetBrains Mono',monospace;">fe_code.py</span>
+          <span style="padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:{{ run.codeTagBg }};color:{{ run.codeTagFg }};">{{ run.codeTag }}</span>
+          <span style="flex:1;"></span>
+          <span style="font-size:12px;color:var(--ui-muted);">{{ codeLineCount }} lines</span>
+          <button style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--color-divider);background:transparent;color:var(--color-text);font:600 12px var(--font-body);cursor:pointer;" style-hover="background:var(--ui-sel);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>Copy
+          </button>
+        </div>
+        <div style="overflow-x:auto;background:var(--ui-code);padding:14px 0;">
+          <sc-for list="{{ codeLines }}" as="l" hint-placeholder-count="20">
+            <div style="display:grid;grid-template-columns:52px 1fr;font:12.5px/1.7 'JetBrains Mono',monospace;">
+              <span style="text-align:right;padding-right:18px;color:var(--ui-faint);user-select:none;">{{ l.n }}</span>
+              <span style="white-space:pre;color:{{ l.fg }};padding-right:24px;">{{ l.text }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- HISTORY -->
+  <sc-if value="{{ isHistory }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:32px 36px 64px;max-width:1180px;display:flex;flex-direction:column;gap:20px;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <h1 style="font-family:var(--font-heading);font-size:32px;margin:0 0 4px;">All runs</h1>
+        <p style="margin:0;color:var(--ui-muted);">Every run keeps its report, leaderboard, feature code and saved model.</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid var(--color-divider);background:var(--ui-card);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ui-muted)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+          <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search datasets" style="border:none;background:transparent;outline:none;font:inherit;font-size:13px;color:var(--color-text);width:160px;">
+        </label>
+        <div style="display:flex;border:1px solid var(--color-divider);border-radius:999px;padding:3px;gap:2px;">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+            <button onClick="{{ f.onClick }}" style="border:none;cursor:pointer;padding:5px 12px;border-radius:999px;font:600 12px var(--font-body);background:{{ f.bg }};color:{{ f.fg }};">{{ f.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <section style="background:var(--ui-card);border-radius:28px;padding:8px 16px;box-shadow:var(--shadow-sm);overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:720px;">
+        <thead><tr>
+          <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Dataset</th>
+          <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Task</th>
+          <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Target</th>
+          <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Best model</th>
+          <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Score</th>
+          <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Status</th>
+          <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ui-muted);font-weight:600;padding:12px 10px;border-bottom:1px solid var(--color-divider);">Started</th>
+        </tr></thead>
+        <tbody>
+          <sc-for list="{{ historyRows }}" as="h" hint-placeholder-count="6">
+            <tr onClick="{{ h.open }}" style="cursor:pointer;" style-hover="background:var(--ui-sel);">
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);"><span style="display:flex;flex-direction:column;"><span style="font-weight:600;">{{ h.dataset }}</span><span style="font-size:12px;color:var(--ui-muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ h.description }}</span></span></td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);">{{ h.task }}</td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);font:500 12px 'JetBrains Mono',monospace;">{{ h.target }}</td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);white-space:nowrap;">{{ h.best }}</td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);text-align:right;white-space:nowrap;"><span style="font-size:11px;color:var(--ui-muted);margin-right:6px;">{{ h.metric }}</span><span style="font:500 12.5px 'JetBrains Mono',monospace;">{{ h.score }}</span></td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;background:{{ h.tagBg }};color:{{ h.tagFg }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ h.dot }};animation:{{ h.anim }};"></span>{{ h.status }}</span></td>
+              <td style="padding:13px 10px;border-bottom:1px solid var(--color-divider);text-align:right;white-space:nowrap;color:var(--ui-muted);font-size:12.5px;">{{ h.created }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      <sc-if value="{{ historyEmpty }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0;padding:28px 10px;text-align:center;color:var(--ui-muted);">No runs match.</p>
+      </sc-if>
+    </section>
+  </div>
+  </sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;run&quot;,&quot;live&quot;,&quot;new&quot;,&quot;history&quot;,&quot;failed&quot;],&quot;default&quot;:&quot;run&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showGraph&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;liveSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0.3,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;s&quot;,&quot;default&quot;:1.2,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.D = this.buildData();
+    const sv = props.startView ?? 'run';
+    this.state = {
+      theme: props.theme ?? 'light',
+      view: sv === 'new' ? 'new' : sv === 'history' ? 'history' : 'run',
+      runId: sv === 'live' ? 'live' : sv === 'failed' ? 'flights' : 'titanic',
+      tab: sv === 'live' ? 'steps' : 'results',
+      liveCount: sv === 'live' ? 3 : 0, liveStarted: sv === 'live',
+      open: {}, file: null, description: '', target: '', formError: null, dragging: false,
+      query: '', filter: 'all',
+    };
+  }
+  componentDidMount() { this.applyTheme(); if (this.state.liveStarted) this.tick(); }
+  componentDidUpdate(pp, ps) { if (ps.theme !== this.state.theme) this.applyTheme(); if (pp.theme !== this.props.theme && this.props.theme) this.setState({ theme: this.props.theme }); }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  applyTheme() {
+    const L = {'--color-bg':'#f5ead8','--color-surface':'#ebddc5','--color-text':'#201e1d','--color-accent':'#c67139','--color-divider':'color-mix(in srgb, #201e1d 13%, transparent)','--ui-card':'#faf4ea','--ui-sel':'color-mix(in srgb, #201e1d 7%, transparent)','--ui-muted':'#6b6255','--ui-faint':'#a39885','--ui-code':'#f2e8d7','--ok-bg':'#e1eecc','--ok-fg':'#46522f','--ok-dot':'#7a8a5e','--bad-bg':'#f7dbd1','--bad-fg':'#8f2f1c','--bad-dot':'#bf4b30','--warn-bg':'#f6e6c0','--warn-fg':'#6b4b0c','--warn-dot':'#c9952e','--accent-fg':'#8c491a','--accent-bg':'#ffe1d0','--on-accent':'#fbf4ea','--shadow-sm':'0 1px 2px color-mix(in srgb, #2e2b25 12%, transparent)'};
+    const Dk = {'--color-bg':'#1f1c18','--color-surface':'#171512','--color-text':'#f2e8d8','--color-accent':'#df8a54','--color-divider':'color-mix(in srgb, #f2e8d8 12%, transparent)','--ui-card':'#292520','--ui-sel':'color-mix(in srgb, #f2e8d8 8%, transparent)','--ui-muted':'#b0a491','--ui-faint':'#7c7263','--ui-code':'#191714','--ok-bg':'#2f3826','--ok-fg':'#c3d4a5','--ok-dot':'#93a675','--bad-bg':'#46241c','--bad-fg':'#f4ab96','--bad-dot':'#d9664a','--warn-bg':'#3f321a','--warn-fg':'#ecc77a','--warn-dot':'#d6a640','--accent-fg':'#f6a06b','--accent-bg':'#3d2618','--on-accent':'#1f1c18','--shadow-sm':'0 0 0 1px color-mix(in srgb, #f2e8d8 7%, transparent)'};
+    const v = this.state.theme === 'dark' ? Dk : L;
+    for (const k in v) document.documentElement.style.setProperty(k, v[k]);
+  }
+  tick() {
+    clearTimeout(this.timer);
+    const total = this.D.runs.live.events.length;
+    if (this.state.liveCount >= total) { this.setState({ tab: 'results' }); return; }
+    const ms = (this.props.liveSpeed ?? 1.2) * 1000;
+    this.timer = setTimeout(() => { this.setState(s => ({ liveCount: s.liveCount + 1 }), () => this.tick()); }, ms);
+  }
+
+  buildData() {
+    const tcode = `# Feature engineering code for Titanic-Dataset.csv, generated by openai:gpt-6.1-sol
+# (generated (attempt 1)). Batch-stateless: run it on a batch and align the result to feature_columns.
+
+import pandas as pd
+import numpy as np
+
+def engineer_features(df: pd.DataFrame, target_column: str) -> pd.DataFrame:
+    features = {}
+    n = len(df)
+
+    def clean_numeric(series):
+        values = pd.to_numeric(series, errors='coerce').astype('float64')
+        values = values.replace([np.inf, -np.inf], np.nan)
+        median = values.median() if values.notna().any() else 0.0
+        return values.fillna(median)
+
+    def add(label, values):
+        if len(features) >= 500:
+            return
+        name = 'f' + str(len(features)) + '_' + str(label)
+        while name == target_column or name in features:
+            name += '_'
+        features[name] = clean_numeric(values)
+
+    for col in df.columns:
+        if col == target_column:
+            continue
+        s = df[col]
+        label = str(col)
+        lower = label.lower()
+        if lower in {'passengerid', 'name', 'ticket'}:
+            continue
+        unique = s.nunique(dropna=True)
+        if n > 1 and unique == n:
+            continue
+        if pd.api.types.is_numeric_dtype(s.dtype):
+            add(label, s)
+            continue
+        text = s.astype('string').fillna('__MISSING__')
+        count = text.nunique(dropna=False)
+        if count <= 20:
+            for level in sorted(text.unique().tolist()):
+                add(label + '_' + str(level), text.eq(level).astype('int8'))
+        else:
+            add(label + '_frequency', text.map(text.value_counts(normalize=True)))
+
+    if all(c in df.columns and c != target_column for c in ('SibSp', 'Parch')):
+        family_size = (clean_numeric(df['SibSp']).clip(lower=0)
+                       + clean_numeric(df['Parch']).clip(lower=0) + 1)
+        add('family_size', family_size)
+        if 'Fare' in df.columns and target_column != 'Fare':
+            add('fare_per_family_member', clean_numeric(df['Fare']) / family_size.clip(lower=1))
+    if 'Cabin' in df.columns and target_column != 'Cabin':
+        add('cabin_recorded', df['Cabin'].notna().astype('int8'))
+
+    result = pd.DataFrame(features, index=df.index)
+    result[target_column] = df[target_column].copy()
+    return result`;
+    const fbcode = `# Deterministic fallback recipe for taxis.csv (used after 3 failed LLM attempts).
+# No LLM involved: identical output on every run.
+
+import pandas as pd
+import numpy as np
+
+def engineer_features(df: pd.DataFrame, target_column: str) -> pd.DataFrame:
+    out = pd.DataFrame(index=df.index)
+    for col in df.columns:
+        if col == target_column:
+            continue
+        s = df[col]
+        if pd.api.types.is_numeric_dtype(s):
+            out[col] = s.replace([np.inf, -np.inf], np.nan).fillna(s.median())
+        elif s.nunique(dropna=False) <= 20:
+            out = out.join(pd.get_dummies(s.fillna('__MISSING__'), prefix=col, dtype='int8'))
+        else:
+            out[col + '_frequency'] = s.map(s.value_counts(normalize=True)).fillna(0.0)
+    out[target_column] = df[target_column]
+    return out`;
+    const titanicReport = `# Run report: Titanic-Dataset.csv
+_Generated 2026-10-18 23:24 by auto-ds-agent. Narrative by openai:gpt-6.1-sol; every number in it was checked against the run's computed results._
+## Summary
+The run predicted whether passengers in Titanic-Dataset.csv survived and recommends Hist Gradient Boosting. Its cross-validated ROC-AUC was 0.879 ± 0.023, exceeding the class-prior baseline of 0.500 by 0.379.
+## Dataset
+891 rows × 12 columns; 0 duplicate rows.
+## Task
+**binary_classification** · target \`Survived\` · router confidence 1.00
+This was a binary classification task with Survived as the target, matching the request to predict passenger survival. The target contains exactly two values, 0 and 1, and the task router assigned confidence of 1.00.
+## Feature engineering
+Feature engineering passed validation on the first attempt, and that generated code was used for the final features. PassengerId, Name, and Ticket were dropped as identifiers or high-cardinality text. Numeric predictors received median imputation; Sex and Embarked were one-hot encoded; and Cabin was frequency-encoded with missing cabins treated as a separate level. Added features captured family size, fare per family member, and whether a cabin was recorded. The target was preserved unchanged and was not used to construct features.
+## Leaderboard
+| Rank | Model |
+## Recommendation
+Choose Hist Gradient Boosting: it had the highest mean ROC-AUC and satisfied the selection rule's requirement to beat every simpler model on at least 4 of 5 shared folds. It beat LightGBM, XGBoost, and Random Forest on 4 of 5 folds each, and Logistic Regression on 5 of 5 folds. Logistic Regression scored lower at 0.853. Prediction cost and interpretability were not quantified in the supplied results, so assess those requirements before making a deployment decision.
+## Caveats and next steps
+- The dataset contains 891 rows, and the reported performance comes from 5-fold cross-validation; validate the selected model on independent data before deployment.
+- Selection was based on ROC-AUC. Before using survival predictions for decisions, evaluate an appropriate decision threshold and its resulting errors.
+- No warnings were recorded, and feature engineering passed validation; neither required a fallback.`;
+    const mpgReport = `# Run report: mpg.csv
+_Generated 2026-10-17 06:19 by auto-ds-agent. Narrative by openai:gpt-6.1-sol; every number in it was checked against the run's computed results._
+## Summary
+The run predicted car fuel efficiency in miles per gallon and recommends Hist Gradient Boosting. Its cross-validation RMSE was 2.811 mpg, 64.0% lower than the mean-prediction baseline's RMSE of 7.805.
+## Dataset
+398 rows × 9 columns; 0 duplicate rows.
+## Task
+Regression was selected with mpg as the target, matching the request to predict fuel efficiency. The target is numeric with 129 distinct values ranging from 9.0 to 46.6, supporting treatment as a continuous quantity rather than a classification task.
+## Feature engineering
+The generated feature-engineering code passed validation on the first attempt and was used for the final features. It dropped the high-cardinality car-name column, retained numeric vehicle measurements and model year, imputed missing or non-finite numeric values with column medians, and one-hot encoded origin. It also added horsepower per unit weight and displacement per cylinder without using the target.
+## Leaderboard
+| Rank | Model |
+## Recommendation
+Use Hist Gradient Boosting. Random Forest had the lowest mean RMSE at 2.772, but beat Hist Gradient Boosting on only 3 of 5 shared folds. Choosing the simpler Hist Gradient Boosting was deliberate: the selection rule requires a higher-scoring model to beat every simpler model on at least 4 of 5 folds. Ridge Regression is an alternative if prediction cost or interpretability is the priority.
+## Caveats and next steps
+- The dataset contains 398 rows; check performance on additional cars before relying on the model more broadly.
+- Results come from shared 5-fold cross-validation. Hist Gradient Boosting's RMSE was 2.811 ± 0.435, so consider fold-to-fold variation alongside the mean.
+- Random Forest and LightGBM had slightly lower mean errors than the selected model. Keep them as comparison candidates if evaluating on new data.`;
+    const taxisReport = `# Run report: taxis.csv
+_Generated 2026-10-17 06:18 by auto-ds-agent. Narrative by openai:gpt-6.1-sol; every number in it was checked against the run's computed results._
+## Summary
+The run estimated the tip for New York taxi rides and recommends LightGBM, with a cross-validated RMSE of 1.412, 32.2% lower than the mean-prediction baseline's 2.083. Features came from the deterministic fallback recipe after three generated attempts failed.
+## Task
+Regression was selected with tip as the target, inferred from the request because no target column was given. Router confidence was 0.86.
+## Feature engineering
+All three generated attempts failed in the sandbox: a timezone mismatch when subtracting pickup and dropoff times, a validation rejection for a feature derived from the target (tip ratio), and a timeout. The run then used the fallback recipe: median-imputed numeric columns, one-hot encoded low-cardinality categories and frequency-encoded zones.
+## Leaderboard
+| Rank | Model |
+## Caveats and next steps
+- The fallback features ignore ride timestamps; a duration feature would likely help. Re-run with a description that mentions pickup and dropoff times.
+- Confirm that tip is the intended target; it was inferred, not given.`;
+    const flightsReport = `# Run report: flights.csv
+_Generated 2026-10-17 06:20 by auto-ds-agent._
+## Summary
+The run ended without training a model. The request asks to forecast future passenger numbers from a monthly series, which is time-series forecasting, and that task is out of scope for this version of the agent.
+## Dataset
+144 rows × 3 columns (year, month, passengers); 0 duplicate rows.
+## Task
+The router classified the request as time_series_forecasting with passengers as the target (confidence 0.93). The sanity check stopped the run here instead of training cross-validated models on shuffled folds, which would leak future values into training.
+## Caveats and next steps
+- To use this dataset, phrase a non-temporal question, for example predicting passengers from month and year as a plain regression, accepting that it will not forecast.
+- Supported tasks: binary classification, multiclass classification and regression on a single table.`;
+
+    const E = (node, ok, text, attempt, t, detail, dkind) => ({ node, ok, text, attempt, t, detail, dkind });
+    const routerJson = (task, target, conf, why) => `{\n  "task_type": "${task}",\n  "target_column": "${target}",\n  "confidence": ${conf},\n  "reasoning": "${why}"\n}`;
+    const codeHead = tcode.split('\n').slice(6, 22).join('\n') + '\n    …';
+    const arenaDetail = (rows) => rows;
+    const titanicBoard = [
+      ['hgb','Hist Gradient Boosting',{roc_auc:[.8792,.0232],accuracy:[.8316,.0161],precision:[.8036,.0195],recall:[.7426,.0362]},1.17,10.9,true],
+      ['lgbm','LightGBM',{roc_auc:[.8744,.0255],accuracy:[.8238,.0239],precision:[.7812,.0445],recall:[.7544,.0327]},0.38,15.1],
+      ['xgb','XGBoost',{roc_auc:[.8722,.0273],accuracy:[.8193,.0254],precision:[.7842,.0410],recall:[.7309,.0396]},2.03,11.5],
+      ['rf','Random Forest',{roc_auc:[.8686,.0288],accuracy:[.8114,.0255],precision:[.7587,.0423],recall:[.7484,.0308]},1.82,45.1],
+      ['logreg','Logistic Regression',{roc_auc:[.8532,.0215],accuracy:[.7957,.0238],precision:[.7429,.0329],recall:[.7162,.0481]},0.05,16.5],
+      ['dummy','Dummy (class priors)',{roc_auc:[.5,0],accuracy:[.6162,.0023],precision:[0,0],recall:[0,0]},0.00,5.8,false,true],
+    ];
+    const titanicEvents = [
+      E('profiler',true,'891 rows × 12 columns',0,0,'Survived   int64    2 unique · 0 missing\nAge        float64  88 unique · 177 missing (19.9%)\nCabin      object   147 unique · 687 missing (77.1%)\nEmbarked   object   3 unique · 2 missing\n… 8 more columns','code'),
+      E('router',true,'binary_classification → Survived (confidence 1.00)',0,13,routerJson('binary_classification','Survived','1.00','Request asks who survived; Survived is binary (0/1).'),'code'),
+      E('sanity_check',true,'no changes',0,13),
+      E('fe_codegen',true,'attempt 1 written',1,36,codeHead,'code'),
+      E('sandbox',true,'attempt 1 passed validation',1,38,'✓ returned DataFrame · 891 rows (unchanged)\n✓ target column preserved, not used in features\n✓ 19 numeric feature columns, no NaN / inf\n✓ imports allowed: pandas, numpy · 1.9 s','code'),
+      E('arena',true,'best: Hist Gradient Boosting (ROC-AUC 0.879)',1,45,'6 models × 5 shared folds · 7.1 s\nHGB beat LightGBM, XGBoost, Random Forest on 4/5 folds, Logistic Regression on 5/5','code'),
+      E('artifacts',true,'saved',1,45,'best_pipeline.joblib · fe_code.py · leaderboard.csv','code'),
+      E('reporter',true,'report.md written',1,60,'31 numbers in the narrative checked against computed results · 0 mismatches','code'),
+      E('finalize',true,'run.json written',1,60),
+    ];
+    const liveEvents = [
+      titanicEvents[0], titanicEvents[1], titanicEvents[2],
+      E('fe_codegen',true,'attempt 1 written',1,31,codeHead.replace("if lower in {'passengerid', 'name', 'ticket'}:", "deck = df['Cabin'].str[0]\n        df['Deck'] = deck"),'code'),
+      E('sandbox',false,"attempt 1 failed: KeyError: 'Deck'",1,33,"Traceback (most recent call last):\n  File \"fe_code.py\", line 41, in engineer_features\n    add('deck', df['Deck'].map(DECK_ORDER))\n  File \"pandas/core/frame.py\", line 4102, in __getitem__\n    indexer = self.columns.get_loc(key)\nKeyError: 'Deck'\n\n→ error sent back to the LLM for attempt 2",'error'),
+      E('fe_codegen',true,'attempt 2 written',2,52,codeHead,'code'),
+      E('sandbox',true,'attempt 2 passed validation',2,54,'✓ returned DataFrame · 891 rows (unchanged)\n✓ target column preserved, not used in features\n✓ 19 numeric feature columns, no NaN / inf · 1.8 s','code'),
+      E('arena',true,'best: Hist Gradient Boosting (ROC-AUC 0.879)',2,61,'6 models × 5 shared folds · 7.0 s','code'),
+      E('artifacts',true,'saved',2,61),
+      E('reporter',true,'report.md written',2,76,'31 numbers checked · 0 mismatches','code'),
+      E('finalize',true,'run.json written',2,76),
+    ];
+    const titanicWhy = { text: 'It had the highest mean ROC-AUC and beat every simpler model on at least 4 of 5 shared folds, so the rule kept it.', rows: [['LightGBM',4,'won 4/5'],['XGBoost',4,'won 4/5'],['Random Forest',4,'won 4/5'],['Logistic Regression',5,'won 5/5']] };
+    const arts = (fe) => [
+      { name: 'best_pipeline.joblib', desc: 'Fitted model + feature columns', size: '1.4 MB' },
+      { name: 'fe_code.py', desc: fe, size: '3.3 KB' },
+      { name: 'report.md', desc: 'Number-checked written report', size: '3.1 KB' },
+      { name: 'leaderboard.csv', desc: 'All metrics and timings', size: '1.5 KB' },
+    ];
+    const titanic = { id: 'titanic', dataset: 'Titanic-Dataset.csv', description: 'Predict who survived', target: 'Survived', task: 'binary_classification', shape: '891 × 12', ago: '1h', created: 'Oct 18, 23:23', duration: '1:00', cost: '$0.0412', metric: 'roc_auc', lower: false, outcome: 'model', events: titanicEvents, board: titanicBoard, why: titanicWhy, warnings: [], report: titanicReport, code: tcode, codeTag: 'attempt 1 · passed validation', artifacts: arts('Generated feature code') };
+    const live = Object.assign({}, titanic, { id: 'live', dataset: 'Titanic-Dataset.csv', description: 'Predict which passengers survived', target: 'inferred', ago: 'now', created: 'Oct 18, 23:58', duration: '1:16', cost: '$0.0538', events: liveEvents, codeTag: 'attempt 2 · passed validation' });
+    const mpg = { id: 'mpg', dataset: 'mpg.csv', description: 'Predict fuel efficiency', target: 'mpg', task: 'regression', shape: '398 × 9', ago: '1d', created: 'Oct 17, 06:18', duration: '0:58', cost: '$0.0397', metric: 'rmse', lower: true, outcome: 'model',
+      events: [E('profiler',true,'398 rows × 9 columns',0,0),E('router',true,'regression → mpg (confidence 0.99)',0,11,routerJson('regression','mpg','0.99','Fuel efficiency is the continuous mpg column.'),'code'),E('sanity_check',true,'no changes',0,11),E('fe_codegen',true,'attempt 1 written',1,33,codeHead,'code'),E('sandbox',true,'attempt 1 passed validation',1,35),E('arena',true,'best: Hist Gradient Boosting (RMSE 2.811)',1,42,'Random Forest had the best mean RMSE (2.772) but won only 3/5 folds vs HGB → simpler model kept','code'),E('artifacts',true,'saved',1,42),E('reporter',true,'report.md written',1,58),E('finalize',true,'run.json written',1,58)],
+      board: [['rf','Random Forest',{rmse:[2.772,.445],mae:[1.943,.200],r2:[.872,.029]},1.92,22.3],['lgbm','LightGBM',{rmse:[2.793,.388],mae:[1.973,.169],r2:[.871,.023]},0.15,5.3],['hgb','Hist Gradient Boosting',{rmse:[2.811,.435],mae:[1.970,.210],r2:[.869,.030]},0.48,3.7,true],['xgb','XGBoost',{rmse:[3.029,.335],mae:[2.116,.144],r2:[.848,.025]},2.21,2.0],['ridge','Ridge Regression',{rmse:[3.136,.366],mae:[2.329,.208],r2:[.837,.023]},0.02,0.8],['dummy','Dummy (mean)',{rmse:[7.805,.463],mae:[6.538,.373],r2:[-.007,.007]},0.03,1.0,false,true]],
+      why: { text: 'Random Forest had a slightly better mean RMSE but beat Hist Gradient Boosting on only 3 of 5 folds, so the simpler model wins the tie.', rows: [['Random Forest (better mean)',3,'only 3/5 · kept HGB'],['LightGBM (better mean)',3,'only 3/5 · kept HGB'],['XGBoost',4,'won 4/5'],['Ridge Regression',5,'won 5/5']] },
+      warnings: ["Chose Hist Gradient Boosting over Random Forest: Random Forest's better mean RMSE (2.7720 vs 2.8109) held on only 3 of 5 folds."], report: mpgReport, code: tcode.replace(/Titanic-Dataset\.csv/, 'mpg.csv'), codeTag: 'attempt 1 · passed validation', artifacts: arts('Generated feature code') };
+    const taxis = { id: 'taxis', dataset: 'taxis.csv', description: 'Estimate the tip for a taxi ride', target: 'tip (inferred)', task: 'regression', shape: '6,433 × 14', ago: '1d', created: 'Oct 17, 06:16', duration: '2:47', cost: '$0.1184', metric: 'rmse', lower: true, outcome: 'fallback',
+      events: [E('profiler',true,'6,433 rows × 14 columns',0,0),E('router',true,'regression → tip (confidence 0.86)',0,12,routerJson('regression','tip','0.86','No target given; "tip" matches the request and is continuous.'),'code'),E('sanity_check',true,'no changes',0,12),
+        E('fe_codegen',true,'attempt 1 written',1,38,codeHead,'code'),E('sandbox',false,'attempt 1 failed: TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects',1,41,"Traceback (most recent call last):\n  File \"fe_code.py\", line 33, in engineer_features\n    duration = dropoff - pickup\nTypeError: Cannot subtract tz-naive and tz-aware datetime-like objects",'error'),
+        E('fe_codegen',true,'attempt 2 written',2,66,codeHead,'code'),E('sandbox',false,"attempt 2 failed: validation: feature 'tip_ratio' is derived from the target",2,69,"ValidationError: feature 'f14_tip_ratio' has correlation 0.998 with target 'tip'\n→ target leakage is rejected; error sent back to the LLM",'error'),
+        E('fe_codegen',true,'attempt 3 written',3,95,codeHead,'code'),E('sandbox',false,'attempt 3 failed: timed out after 60 s',3,155,'TimeoutError: sandbox process exceeded 60 s and was killed\n→ 3 attempts used; switching to the fallback recipe','error'),
+        E('fallback_fe',true,'deterministic recipe · 21 features',3,156),E('arena',true,'best: LightGBM (RMSE 1.412)',3,149+3,'6 models × 5 shared folds · 9.8 s','code'),E('artifacts',true,'saved',3,152),E('reporter',true,'report.md written',3,167),E('finalize',true,'run.json written',3,167)],
+      board: [['lgbm','LightGBM',{rmse:[1.412,.091],mae:[.842,.041],r2:[.512,.034]},0.41,6.2,true],['hgb','Hist Gradient Boosting',{rmse:[1.420,.088],mae:[.851,.039],r2:[.506,.031]},0.88,5.1],['xgb','XGBoost',{rmse:[1.447,.095],mae:[.866,.044],r2:[.487,.036]},2.64,3.0],['rf','Random Forest',{rmse:[1.468,.102],mae:[.871,.047],r2:[.472,.040]},4.10,61.7],['ridge','Ridge Regression',{rmse:[1.533,.097],mae:[.958,.045],r2:[.424,.033]},0.03,1.1],['dummy','Dummy (mean)',{rmse:[2.083,.118],mae:[1.471,.062],r2:[-.001,.002]},0.01,0.9,false,true]],
+      why: { text: 'LightGBM had the best mean RMSE and beat every simpler model on at least 4 of 5 folds.', rows: [['Hist Gradient Boosting',4,'won 4/5'],['XGBoost',4,'won 4/5'],['Random Forest',5,'won 5/5'],['Ridge Regression',5,'won 5/5']] },
+      warnings: ['Feature engineering failed 3 times; features come from the deterministic fallback recipe.', "Target 'tip' was inferred (router confidence 0.86). Pass a target column to be sure."], report: taxisReport, code: fbcode, codeTag: 'fallback recipe', artifacts: arts('Fallback feature recipe') };
+    const penguins = { id: 'penguins', dataset: 'penguins.csv', description: 'Classify the penguin species', target: 'species', task: 'multiclass_classification', shape: '344 × 7', ago: '1d', created: 'Oct 17, 19:22', duration: '0:52', cost: '$0.0351', metric: 'f1_macro', lower: false, outcome: 'model',
+      events: [E('profiler',true,'344 rows × 7 columns',0,0),E('router',true,'multiclass_classification → species (confidence 0.99)',0,10),E('sanity_check',true,'no changes',0,10),E('fe_codegen',true,'attempt 1 written',1,29,codeHead,'code'),E('sandbox',true,'attempt 1 passed validation',1,31),E('arena',true,'best: Logistic Regression (macro-F1 0.991)',1,37),E('artifacts',true,'saved',1,37),E('reporter',true,'report.md written',1,52),E('finalize',true,'run.json written',1,52)],
+      board: [['logreg','Logistic Regression',{f1_macro:[.991,.008],accuracy:[.991,.007]},0.04,1.2,true],['rf','Random Forest',{f1_macro:[.982,.012],accuracy:[.983,.011]},1.31,18.4],['hgb','Hist Gradient Boosting',{f1_macro:[.979,.014],accuracy:[.980,.013]},0.92,6.8],['lgbm','LightGBM',{f1_macro:[.976,.015],accuracy:[.977,.014]},0.33,4.9],['xgb','XGBoost',{f1_macro:[.973,.016],accuracy:[.974,.015]},1.12,2.7],['dummy','Dummy (class priors)',{f1_macro:[.146,.002],accuracy:[.438,.004]},0.00,0.6,false,true]],
+      why: { text: 'The simplest non-baseline model also had the highest mean macro-F1; no more complex model beat it on 4 of 5 folds.', rows: [['Random Forest',2,'only 2/5 vs LR'],['Hist Gradient Boosting',1,'only 1/5 vs LR'],['LightGBM',1,'only 1/5 vs LR'],['XGBoost',1,'only 1/5 vs LR']] },
+      warnings: [], report: titanicReport.replace(/Titanic-Dataset\.csv/g,'penguins.csv'), code: tcode.replace(/Titanic-Dataset\.csv/,'penguins.csv'), codeTag: 'attempt 1 · passed validation', artifacts: arts('Generated feature code') };
+    const flights = { id: 'flights', dataset: 'flights.csv', description: 'Forecast monthly passenger numbers', target: 'passengers', task: 'time_series_forecasting', shape: '144 × 3', ago: '1d', created: 'Oct 17, 06:19', duration: '0:24', cost: '$0.0089', metric: null, outcome: 'none',
+      events: [E('profiler',true,'144 rows × 3 columns',0,0),E('router',true,'time_series_forecasting → passengers (confidence 0.93)',0,9,routerJson('time_series_forecasting','passengers','0.93','The request asks to forecast future values of a monthly series.'),'code'),E('sanity_check',false,'out of scope: time-series forecasting → end',0,9,'Supported tasks: binary_classification, multiclass_classification, regression\nShuffled k-fold CV on a time series leaks future values into training.\n→ graph routed to end; no features, no models','error'),E('reporter',true,'report.md written (no model)',0,24),E('finalize',true,'run.json written',0,24)],
+      board: [], warnings: [], report: flightsReport, code: '', artifacts: [],
+      noModelTitle: 'Time-series forecasting is out of scope', noModelText: 'The router read this request as forecasting future passenger counts. The sanity check stopped the run before feature engineering: shuffled cross-validation on a time series would leak the future into training and report misleading scores.' };
+    const order = ['live','titanic','taxis','penguins','mpg','flights'];
+    return { runs: { live, titanic, mpg, taxis, penguins, flights }, order };
+  }
+
+  renderVals() {
+    const S = this.state, D = this.D, set = (o) => this.setState(o);
+    const ML = { roc_auc:'ROC-AUC', f1_macro:'macro-F1', rmse:'RMSE', mae:'MAE', r2:'R²', accuracy:'accuracy', precision:'precision', recall:'recall' };
+    const TL = { binary_classification:'Binary classification', multiclass_classification:'Multiclass', regression:'Regression', time_series_forecasting:'Time series' };
+    const SL = { profiler:'Profile data', router:'Choose task', sanity_check:'Check decision', fe_codegen:'Write features', sandbox:'Run in sandbox', fallback_fe:'Fallback features', arena:'Benchmark models', artifacts:'Save model', reporter:'Write report', finalize:'Finish' };
+    const fmt = (v) => Math.abs(v) >= 10 ? Math.round(v).toLocaleString('en-US') : v.toFixed(3);
+    const mmss = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.round(s % 60)).padStart(2, '0');
+    const spin = (size) => React.createElement('span', { style: { width: size, height: size, borderRadius: '50%', border: '2px solid color-mix(in srgb, currentColor 25%, transparent)', borderTopColor: 'var(--color-accent)', animation: 'adsSpin .8s linear infinite', display: 'inline-block', flex: 'none' } });
+    const spinnerSm = spin(12);
+
+    const liveDone = S.liveCount >= D.runs.live.events.length;
+    const statusOf = (r) => {
+      if (r.id === 'live' && S.liveStarted && !liveDone) return { label: 'Running', bg: 'var(--accent-bg)', fg: 'var(--accent-fg)', dot: 'var(--color-accent)', anim: 'adsPulse 1.2s ease-in-out infinite', key: 'running' };
+      if (r.outcome === 'none') return { label: 'No model', bg: 'var(--bad-bg)', fg: 'var(--bad-fg)', dot: 'var(--bad-dot)', anim: 'none', key: 'failed' };
+      if (r.outcome === 'fallback') return { label: 'Finished · fallback', bg: 'var(--warn-bg)', fg: 'var(--warn-fg)', dot: 'var(--warn-dot)', anim: 'none', key: 'finished' };
+      return { label: 'Finished', bg: 'var(--ok-bg)', fg: 'var(--ok-fg)', dot: 'var(--ok-dot)', anim: 'none', key: 'finished' };
+    };
+    const visibleOrder = D.order.filter(id => id !== 'live' || S.liveStarted);
+    const bestOf = (r) => r.board.find(b => b[5]);
+    const openRun = (id) => () => set({ view: 'run', runId: id, tab: id === 'live' && !liveDone ? 'steps' : 'results', open: {} });
+
+    const sideRuns = visibleOrder.map(id => { const r = D.runs[id], st = statusOf(r), b = bestOf(r);
+      return { dataset: r.dataset, ago: r.ago, dot: st.dot, anim: st.anim, open: openRun(id),
+        sub: st.key === 'running' ? 'Running · ' + SL[(r.events[S.liveCount] || {}).node || 'finalize'] : (b ? b[1] + ' · ' + (r.metric ? ML[r.metric] + ' ' + fmt(b[2][r.metric][0]) : '') : 'No model · ' + TL[r.task]),
+        bg: S.view === 'run' && S.runId === id ? 'var(--ui-sel)' : 'transparent' }; });
+
+    // new run form
+    const file = S.file;
+    const samples = [['Titanic-Dataset.csv','891 rows · binary','Predict who survived','Survived'],['penguins.csv','344 rows · multiclass','Classify the penguin species',''],['mpg.csv','398 rows · regression','Predict fuel efficiency','mpg'],['ames_train.csv','1,460 rows · regression','Predict the house sale price','SalePrice']]
+      .map(([name, meta, desc, tgt]) => ({ name, meta, pick: () => set({ file: { name, size: name === 'ames_train.csv' ? 460800 : 61440, sample: true }, description: desc, target: tgt, formError: null }) }));
+    const checkFile = (f) => { const ext = (f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase(); if (!['.csv','.parquet','.pq'].includes(ext)) return 'Unsupported file type; expected one of: .csv, .parquet, .pq.'; if (f.size === 0) return 'The file is empty.'; if (f.size > 200 * 1048576) return 'File is larger than the 200 MB limit.'; return null; };
+    const choose = (f) => { if (!f) return; const p = checkFile(f); set({ formError: p, file: p ? null : { name: f.name, size: f.size } }); };
+    const fsize = file ? (file.size > 1048576 ? (file.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB') : '';
+    const canSubmit = !!file && S.description.trim() !== '';
+    const steps = [['Profile data','LLM-free','Column types, missing values, cardinality.'],['Choose task','LLM','Classification or regression, and the target.'],['Check decision','','Stops early on out-of-scope tasks.'],['Write features','LLM','Pandas code, run in a sandbox. Errors go back to the LLM, up to 3 attempts.'],['Fallback features','','A fixed recipe if all attempts fail.'],['Benchmark models','','Six models on the same 5 folds.'],['Write report','LLM','Every number checked against the results.']];
+    const pipelineSteps = steps.map(([label, by, text], i) => ({ n: i + 1, label, by: by === 'LLM' ? 'LLM' : '', text, byFg: 'var(--accent-fg)', bg: by === 'LLM' ? 'var(--accent-bg)' : 'var(--ui-sel)', fg: by === 'LLM' ? 'var(--accent-fg)' : 'var(--ui-muted)' }));
+
+    // run view
+    const r = D.runs[S.runId];
+    const isLive = r.id === 'live' && S.liveStarted && !liveDone;
+    const events = r.id === 'live' ? r.events.slice(0, S.liveCount) : r.events;
+    const st = statusOf(r);
+    const hasModel = r.outcome !== 'none' && !isLive;
+    const best = bestOf(r);
+    const lastT = events.length ? events[events.length - 1].t : 0;
+
+    // graph
+    const nextNode = (() => { if (!isLive) return null; const last = events[events.length - 1]; if (!last) return 'profiler';
+      const m = { profiler:'router', router:'sanity_check', sanity_check:'fe_codegen', fe_codegen:'sandbox', fallback_fe:'arena', arena:'artifacts', artifacts:'reporter', reporter:'finalize' };
+      if (last.node === 'sandbox') return last.ok ? 'arena' : (last.attempt >= 3 ? 'fallback_fe' : 'fe_codegen'); return m[last.node]; })();
+    const nodeState = (node) => { const evs = events.filter(e => e.node === node); if (nextNode === node) return 'active'; if (!evs.length) return (!isLive && r.outcome !== 'none') || (r.outcome === 'none' && !['profiler','router','sanity_check'].includes(node)) ? 'skipped' : 'pending'; const last = evs[evs.length - 1]; if (!last.ok) { if (node === 'sandbox' && events.some(e => e.node === 'sandbox' && e.ok)) return 'done'; if (node === 'sandbox' && events.some(e => e.node === 'fallback_fe')) return 'fail'; return isLive && node === 'sandbox' ? 'fail' : 'fail'; } return 'done'; };
+    const look = (stt, label) => { const base = { label, isDone: stt === 'done', isFail: stt === 'fail', isActive: stt === 'active', opacity: 1, borderStyle: 'solid' };
+      if (stt === 'done') return Object.assign(base, { bg: 'var(--ok-bg)', fg: 'var(--ok-fg)', border: 'transparent' });
+      if (stt === 'fail') return Object.assign(base, { bg: 'var(--bad-bg)', fg: 'var(--bad-fg)', border: 'transparent' });
+      if (stt === 'active') return Object.assign(base, { bg: 'transparent', fg: 'var(--color-text)', border: 'var(--color-accent)' });
+      if (stt === 'skipped') return Object.assign(base, { bg: 'transparent', fg: 'var(--ui-muted)', border: 'var(--color-divider)', borderStyle: 'dashed', opacity: 0.7 });
+      return Object.assign(base, { bg: 'transparent', fg: 'var(--ui-muted)', border: 'var(--color-divider)' }); };
+    const maxAttempt = Math.max(0, ...events.filter(e => e.node === 'fe_codegen').map(e => e.attempt));
+    const lineFor = (n) => ['done'].includes(nodeState(n)) ? 'var(--ok-dot)' : 'var(--color-divider)';
+    const fbState = events.some(e => e.node === 'fallback_fe') ? 'warn' : nextNode === 'fallback_fe' ? 'active' : 'idle';
+    const fb = fbState === 'warn' ? { bg: 'var(--warn-bg)', fg: 'var(--warn-fg)', border: 'transparent', borderStyle: 'solid', opacity: 1 } : fbState === 'active' ? { bg: 'transparent', fg: 'var(--color-text)', border: 'var(--color-accent)', borderStyle: 'solid', opacity: 1 } : { bg: 'transparent', fg: 'var(--ui-muted)', border: 'var(--color-divider)', borderStyle: 'dashed', opacity: 0.7 };
+    const graph = [];
+    ['profiler','router','sanity_check'].forEach((n, i) => graph.push(Object.assign(look(nodeState(n), SL[n]), { isNode: true, connector: i > 0, lineColor: lineFor(n) })));
+    graph.push({ isLoop: true, connector: true, lineColor: lineFor('fe_codegen'), caption: maxAttempt ? 'attempt ' + maxAttempt + ' / 3' : '≤ 3 attempts', fb,
+      nodes: ['fe_codegen','sandbox'].map((n, i) => Object.assign(look(nodeState(n), SL[n]), { connector: i > 0 })) });
+    ['arena','artifacts','reporter'].forEach((n) => graph.push(Object.assign(look(nodeState(n), SL[n]), { isNode: true, connector: true, lineColor: lineFor(n) })));
+    const graphCaption = isLive ? 'Live · ' + events.length + ' of ~' + r.events.length + ' stages' : r.outcome === 'none' ? 'Stopped at the sanity check' : r.outcome === 'fallback' ? 'Recovered with the fallback recipe' : 'Completed in ' + r.duration;
+
+    // timeline
+    const mkRow = (e, idx) => { const isOpen = !!S.open[idx]; const has = !!e.detail;
+      return { label: SL[e.node] || e.node, text: e.text, t: mmss(e.t), ok: e.ok, fail: !e.ok, running: false,
+        iconBg: e.ok ? 'var(--ok-bg)' : 'var(--bad-bg)', iconFg: e.ok ? 'var(--ok-fg)' : 'var(--bad-fg)', textFg: e.ok ? 'var(--ui-muted)' : 'var(--bad-fg)',
+        cursor: has ? 'pointer' : 'default', chevron: isOpen ? 'rotate(90deg)' : 'none', chevOpacity: has ? 1 : 0, showDetail: has && isOpen, detail: e.detail,
+        detailFg: e.dkind === 'error' ? 'var(--bad-fg)' : 'var(--color-text)',
+        toggle: has ? () => this.setState(s => ({ open: Object.assign({}, s.open, { [idx]: !s.open[idx] }) })) : undefined }; };
+    const timeline = [];
+    events.forEach((e, idx) => { const row = mkRow(e, idx);
+      if ((e.node === 'fe_codegen' || e.node === 'sandbox') && e.attempt >= 1) { const last = timeline[timeline.length - 1];
+        if (last && last.isAttempt && last.attempt === e.attempt) last.rows.push(row); else timeline.push({ isAttempt: true, attempt: e.attempt, rows: [row], evs: [] });
+        timeline[timeline.length - 1].evs.push(e);
+      } else timeline.push({ isStage: true, row }); });
+    timeline.forEach(it => { if (!it.isAttempt) return; const sb = it.evs.find(e => e.node === 'sandbox');
+      const s = !sb ? ['in progress','var(--accent-bg)','var(--accent-fg)','var(--color-accent)'] : sb.ok ? ['passed','var(--ok-bg)','var(--ok-fg)','var(--color-divider)'] : ['failed','var(--bad-bg)','var(--bad-fg)','var(--color-divider)'];
+      it.status = s[0]; it.tagBg = s[1]; it.tagFg = s[2]; it.border = s[3]; });
+    if (isLive) timeline.push({ isStage: true, row: { label: SL[nextNode] || 'Working', text: 'working…', t: '', ok: false, fail: false, running: true, iconBg: 'var(--accent-bg)', iconFg: 'var(--accent-fg)', textFg: 'var(--ui-muted)', cursor: 'default', chevron: 'none', chevOpacity: 0, showDetail: false } });
+
+    // leaderboard
+    let board = [], metricHeads = [], scaleText = '', whyRows = [];
+    if (hasModel && r.board.length) {
+      const keys = Object.keys(r.board[0][2]);
+      metricHeads = keys.map((k, i) => ({ label: ML[k] + (i === 0 ? (r.lower ? ' ↓' : ' ↑') : ''), fg: i === 0 ? 'var(--color-text)' : 'var(--ui-muted)' }));
+      const offs = [[.9,-1.1,.3,-.5,.4],[-.6,1.2,-.2,.8,-1.2],[1.1,-.3,-.9,.6,-.5],[-1,.4,1,-.7,.3],[.2,.9,-1.2,-.3,.4],[0,0,0,0,0]];
+      const folds = r.board.map((b, i) => b[2][r.metric] ? offs[i % 6].map(o => b[2][r.metric][0] + o * b[2][r.metric][1]) : []);
+      const real = folds.filter((f, i) => !r.board[i][7]).flat();
+      let lo = Math.min(...real), hi = Math.max(...real); const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+      scaleText = fmt(lo) + ' – ' + fmt(hi) + ' ' + ML[r.metric];
+      board = r.board.map((b, i) => ({ rank: i + 1, name: b[1], best: !!b[5], baseline: !!b[7], weight: b[5] ? 700 : 500, bg: b[5] ? 'color-mix(in srgb, var(--ok-bg) 55%, transparent)' : 'transparent',
+        cells: keys.map((k, j) => ({ mean: fmt(b[2][k][0]), std: b[2][k][1].toFixed(3), weight: j === 0 ? 600 : 400, fg: j === 0 ? 'var(--color-text)' : 'var(--ui-muted)' })),
+        dots: b[7] ? [] : folds[i].map(v => ({ left: (Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * 100).toFixed(1) + '%', bg: b[5] ? 'var(--ok-dot)' : 'var(--ui-muted)' })),
+        train: b[3].toFixed(2), predict: b[4].toFixed(1) }));
+      whyRows = r.why.rows.map(([vs, wins, verdict]) => { const ok = /^won/.test(verdict); return { vs, verdict, fg: ok ? 'var(--ok-fg)' : 'var(--ui-muted)',
+        folds: [0,1,2,3,4].map(k => ({ bg: k < wins ? (ok ? 'var(--ok-dot)' : 'var(--ui-faint)') : 'transparent', border: k < wins ? 'transparent' : 'var(--color-divider)' })) }; });
+    }
+    const baseline = r.board.find(b => b[7]);
+    let liftText = '', liftSub = '';
+    if (best && baseline) { const bv = best[2][r.metric][0], dv = baseline[2][r.metric][0];
+      if (r.lower) { liftText = '−' + ((1 - bv / dv) * 100).toFixed(1) + '% error'; liftSub = 'vs ' + fmt(dv) + ' baseline (' + baseline[1] + ')'; }
+      else { liftText = '+' + (bv - dv).toFixed(3); liftSub = 'over ' + fmt(dv) + ' baseline (' + baseline[1] + ')'; } }
+
+    const runVm = { dataset: r.dataset, description: r.id === 'live' ? r.description : r.description, isLive, canReplay: r.id === 'live' && liveDone,
+      elapsed: mmss(lastT), statusLabel: st.label, tagBg: st.bg, tagFg: st.fg, dot: st.dot, anim: st.anim,
+      chips: [{ k: 'task', v: TL[r.task] }, { k: 'target', v: r.target }, { k: 'shape', v: r.shape }, { k: 'duration', v: isLive ? mmss(lastT) : r.duration }],
+      noModel: r.outcome === 'none', noModelTitle: r.noModelTitle, noModelText: r.noModelText, hasModel,
+      hasWarnings: r.warnings.length > 0, warnings: r.warnings,
+      bestName: best ? best[1] : '', bestScore: best ? fmt(best[2][r.metric][0]) : '', bestStd: best ? best[2][r.metric][1].toFixed(3) : '', metricLabel: r.metric ? ML[r.metric] : '',
+      dirText: r.lower ? 'lower is better' : 'higher is better', liftText, liftSub, whyText: r.why ? r.why.text : '', whyRows, artifacts: r.artifacts, cost: r.cost,
+      metricHeads, board, scaleText, codeTag: r.codeTag, codeTagBg: r.outcome === 'fallback' ? 'var(--warn-bg)' : 'var(--ok-bg)', codeTagFg: r.outcome === 'fallback' ? 'var(--warn-fg)' : 'var(--ok-fg)' };
+
+    const hasCode = !!r.code && !isLive;
+    const tabDefs = [['results','Results', !hasModel && r.outcome !== 'none', ''],['steps','Steps', false, events.length],['report','Report', isLive, ''],['code','Feature code', !hasCode, '']];
+    const tabs = tabDefs.map(([key, label, disabled, count]) => ({ label, count, disabled, onClick: () => set({ tab: key }), line: S.tab === key ? 'var(--color-accent)' : 'transparent', fg: S.tab === key ? 'var(--color-text)' : 'var(--ui-muted)', opacity: disabled ? 0.4 : 1 }));
+    const tab = (tabDefs.find(t => t[0] === S.tab) || [])[2] ? 'steps' : S.tab;
+
+    const strip = (t) => t.replace(/\*\*/g, '').replace(/`/g, '').replace(/ ✅/g, '');
+    const reportBlocks = [];
+    r.report.split('\n').forEach(line => { if (!line.trim() || line.startsWith('# ')) return;
+      if (line.startsWith('## ')) reportBlocks.push({ isH: true, text: line.slice(3) });
+      else if (line.startsWith('_')) reportBlocks.push({ isMeta: true, text: line.replace(/^_|_$/g, '') });
+      else if (line.startsWith('- ')) reportBlocks.push({ isLi: true, text: strip(line.slice(2)) });
+      else if (line.startsWith('|')) { if (!reportBlocks.length || !reportBlocks[reportBlocks.length - 1].isTable) reportBlocks.push({ isTable: true }); }
+      else reportBlocks.push({ isP: true, text: strip(line) }); });
+    const codeLines = (r.code || '').split('\n').map((text, i) => ({ n: i + 1, text: text || ' ', fg: text.trim().startsWith('#') ? 'var(--ui-muted)' : 'var(--color-text)' }));
+
+    // history
+    const q = S.query.trim().toLowerCase();
+    const historyRows = visibleOrder.map(id => D.runs[id]).filter(x => (!q || x.dataset.toLowerCase().includes(q) || x.description.toLowerCase().includes(q)) && (S.filter === 'all' || statusOf(x).key === S.filter))
+      .map(x => { const s = statusOf(x), b = bestOf(x), runningNow = s.key === 'running';
+        return { dataset: x.dataset, description: x.description, task: TL[x.task], target: x.target, best: runningNow ? '—' : (b ? b[1] : '—'), metric: b && !runningNow ? ML[x.metric] : '', score: b && !runningNow ? fmt(b[2][x.metric][0]) : '—', status: s.label, tagBg: s.bg, tagFg: s.fg, dot: s.dot, anim: s.anim, created: x.created, open: openRun(x.id) }; });
+    const filters = [['all','All'],['running','Running'],['finished','Finished'],['failed','No model']].map(([k, label]) => ({ label, onClick: () => set({ filter: k }), bg: S.filter === k ? 'var(--color-accent)' : 'transparent', fg: S.filter === k ? 'var(--on-accent)' : 'var(--ui-muted)' }));
+
+    const dark = S.theme === 'dark';
+    return {
+      sideRuns, spinnerSm,
+      goNew: () => set({ view: 'new' }), goHistory: () => set({ view: 'history' }),
+      setLight: () => this.setState({ theme: 'light' }, () => this.applyTheme()), setDark: () => this.setState({ theme: 'dark' }, () => this.applyTheme()),
+      lightBg: dark ? 'transparent' : 'var(--color-accent)', lightFg: dark ? 'var(--ui-muted)' : 'var(--on-accent)',
+      darkBg: dark ? 'var(--color-accent)' : 'transparent', darkFg: dark ? 'var(--on-accent)' : 'var(--ui-muted)',
+      isNew: S.view === 'new', isRunView: S.view === 'run', isHistory: S.view === 'history',
+      crumbRoot: S.view === 'new' ? 'New run' : 'Runs', hasCrumb: S.view === 'run', crumbLeaf: r.dataset,
+      // form
+      hasFile: !!file, noFile: !file,
+      dropTitle: file ? file.name : 'Drop a CSV or Parquet file here', dropSub: file ? fsize + (file.sample ? ' · sample dataset' : '') + ' · click or drop to replace' : 'or click to choose one · .csv, .parquet · up to 200 MB',
+      dropBorder: S.dragging ? 'var(--color-accent)' : file ? 'var(--ok-dot)' : 'var(--color-divider)', dropBg: S.dragging ? 'var(--accent-bg)' : file ? 'color-mix(in srgb, var(--ok-bg) 45%, transparent)' : 'var(--color-bg)',
+      dropIconBg: file ? 'var(--ok-bg)' : 'var(--accent-bg)', dropIconFg: file ? 'var(--ok-fg)' : 'var(--accent-fg)',
+      onDragOver: (e) => { e.preventDefault(); if (!S.dragging) set({ dragging: true }); }, onDragLeave: () => set({ dragging: false }),
+      onDrop: (e) => { e.preventDefault(); this.setState({ dragging: false }); choose(e.dataTransfer.files[0]); },
+      onFile: (e) => choose(e.target.files && e.target.files[0]), clearFile: (e) => { e.preventDefault(); e.stopPropagation(); set({ file: null }); },
+      description: S.description, onDesc: (e) => set({ description: e.target.value }), target: S.target, onTarget: (e) => set({ target: e.target.value }),
+      formError: S.formError, cantSubmit: !canSubmit, submitOpacity: canSubmit ? 1 : 0.45,
+      startRun: () => { if (!canSubmit) return; this.setState({ view: 'run', runId: 'live', tab: 'steps', liveCount: 0, liveStarted: true, open: {}, file: null, description: '', target: '' }, () => this.tick()); },
+      samples, pipelineSteps,
+      // run
+      run: runVm, showGraph: this.props.showGraph ?? true, graph, graphCaption, tabs,
+      tabResults: tab === 'results', tabSteps: tab === 'steps', tabReport: tab === 'report', tabCode: tab === 'code',
+      timeline, reportBlocks, codeLines, codeLineCount: codeLines.length,
+      goReport: () => set({ tab: 'report' }), goResults: () => set({ tab: 'results' }),
+      replay: () => this.setState({ liveCount: 0, tab: 'steps', open: {} }, () => this.tick()),
+      // history
+      query: S.query, onQuery: (e) => set({ query: e.target.value }), filters, historyRows, historyEmpty: historyRows.length === 0,
+    };
+  }
+}
+</script>
+</body>
+</html>

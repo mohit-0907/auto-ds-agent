@@ -231,3 +231,26 @@ def test_missing_run_dir_fails_loudly(finished: dict) -> None:
     finished["run_dir"] = ""
     with pytest.raises(ValueError, match="run_dir"):
         reporter_node(finished)
+
+
+def test_facts_state_the_lift_over_the_baseline(finished: dict) -> None:
+    # hgb mean 0.882 vs the dummy's 0.500: the same lift the web app's results card shows.
+    assert (
+        "- Baseline (Dummy (class priors)): ROC-AUC 0.500. The best model is 0.382 higher."
+        in build_facts(finished)
+    )
+
+    def rmse(model_id: str, name: str, value: float) -> ModelResult:
+        return ModelResult(
+            model_id=model_id,
+            model_name=name,
+            status="success",
+            metrics={"rmse": value},
+            metrics_std={"rmse": 0.1},
+            primary_metric="rmse",
+            fold_scores=[value] * 5,
+        )
+
+    board = [rmse("hgb", "Hist Gradient Boosting", 2.0), rmse("dummy", "Dummy (mean)", 8.0)]
+    facts = build_facts(make_state(dataset_path="x.csv", leaderboard=board, best_model_id="hgb"))
+    assert "The best model's RMSE is 75.0% lower than the baseline's." in facts

@@ -17,6 +17,8 @@ venv/
 
 # Tooling caches
 .pytest_cache/
+.coverage
+htmlcov/
 .ruff_cache/
 .mypy_cache/
 .ipynb_checkpoints/
@@ -26,3 +28,7 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Web frontend (installed packages and build output)
+web/node_modules/
+web/dist/
