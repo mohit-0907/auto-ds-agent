@@ -39,7 +39,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="grid h-screen grid-cols-1 bg-page text-ink min-[760px]:grid-cols-[268px_minmax(0,1fr)]">
       <div
         id="sidebar"
-        className={`fixed inset-y-0 left-0 z-30 flex w-[268px] min-[760px]:static min-[760px]:w-auto ${
+        // min-w-0: a grid item is never narrower than its widest content by default, so a
+        // long run subline would push the sidebar past its 268 px column, over the page.
+        className={`fixed inset-y-0 left-0 z-30 flex w-[268px] min-w-0 min-[760px]:static min-[760px]:w-auto ${
           drawerOpen ? 'shadow-card' : 'max-[759px]:hidden'
         }`}
       >
