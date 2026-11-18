@@ -8,9 +8,9 @@ best pipeline with a written justification.
 statistic, and training run is deterministic. The LLM is confined to three nodes —
 task routing, feature-engineering codegen, and the final report.
 
-Status: **Phase 6 of 8 — one command takes a CSV to a written, number-verified report**
-(profiling, task routing, self-repairing feature engineering, fallback, cross-validated
-model arena, report, saved model). A web app (FastAPI + React, Phase 7) is next.
+Status: **Phase 8 of 8 (hardening)** — a CLI and a web app (FastAPI + React, live progress
+over Server-Sent Events) take a CSV to a number-verified report, a leaderboard and a saved
+model. CI runs both test suites on every push.
 
 See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
 
@@ -36,6 +36,40 @@ Dashed arrows are decisions made in code by reading the shared state:
 
 The diagram is generated from the code (`uv run python scripts/render_graph.py`); a test
 fails if `docs/graph.mmd` no longer matches the graph.
+
+## Evaluation
+
+Live runs against the real LLMs (`uv run pytest tests/eval_<name>.py -s`; not part of the
+test suite or CI, since they cost money and need the network).
+
+| What | How | Target | Result |
+|---|---|---|---|
+| Router picks task type and target | 10 labelled datasets, 3 repeats (`eval_router`) | ≥ 80% | **10/10**, all 3 repeats |
+| Generated FE passes on the first attempt | 10 datasets, targets given (`eval_fe`) | ≥ 60% | **10/10** |
+| Generated FE passes within 3 attempts | same run | ≥ 90% | **10/10** |
+| Chosen model clearly beats the dummy baseline | 5 datasets, full pipeline (`eval_arena`) | 5/5 | **5/5** |
+| Same features → identical leaderboard | same 5, arena re-run on the saved features | 5/5 | **5/5** |
+| LLM cost per full run | `token_cost_usd` of 14 real CLI and web runs | report it | **$0.023** mean ($0.019–$0.027) |
+
+How to read these numbers, including the parts that flatter the agent:
+
+- **The FE result is a ceiling, not a rate.** 10/10 on the first attempt means this eval set
+  is too easy to exercise the corrective loop. These are well-known public datasets
+  (Titanic, iris, diamonds…), probably familiar to the model, and it is a single pass:
+  generated code differs between runs. The loop is shown working by `eval_graph`, which
+  injects faults: a dropped row was repaired on attempt 2; a 0.01 s timeout failed all 3
+  attempts and the fallback recipe took over. One natural failure was repaired on Titanic
+  in development (attempt 1 wrote into a read-only pandas 3 array; attempt 2 passed).
+- **The router descriptions are explicit** ("predict the sale price…"), and the sanity check
+  never had to correct a decision in the eval; its value is shown by unit tests. A harder
+  set with vague descriptions and ambiguous targets is the obvious next eval.
+- **A leakage trap did not fire**: a text copy of the target was planted in a dataset, and
+  the model excluded it itself in 3 of 3 runs, so the validator's leakage check (tested
+  offline) was never needed live.
+- **A good score is not always a good model.** On `healthexp` (life expectancy by country and
+  year) the arena reports an RMSE of 0.32 years, because random K-fold lets a model fill in
+  a gap between a country's neighbouring years. Forecasting future years would be far
+  less accurate. The report flagged this as a caveat; the agent cannot detect it.
 
 ## Usage
 
