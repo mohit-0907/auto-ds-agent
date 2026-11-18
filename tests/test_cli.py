@@ -1,6 +1,7 @@
 """Tests for the `autods` command line, end to end with a scripted LLM."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,10 @@ from tests.helpers import install_scripted_llm, ok_result
 
 TITANIC = PROJECT_ROOT / "datasets" / "Titanic-Dataset.csv"
 runner = CliRunner()
+# Terminal colour codes such as "\x1b[1;36m". Typer forces colour when GITHUB_ACTIONS (or
+# FORCE_COLOR / PY_COLORS) is set, and then styles the two dashes of "--description"
+# separately, so the plain text only appears once the codes are removed.
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 DECISION = TaskDecision(
     task_type="binary_classification", target_column="Survived", reasoning="r", confidence=0.95
@@ -152,5 +157,6 @@ def test_help_lists_the_options() -> None:
     result = runner.invoke(app, ["run", "--help"])
 
     assert result.exit_code == 0
+    text = ANSI.sub("", result.output)  # the same words, coloured (CI) or not (local)
     for option in ["--description", "--target", "--runs-dir", "--verbose"]:
-        assert option in result.output
+        assert option in text
