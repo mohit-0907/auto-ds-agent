@@ -85,9 +85,14 @@ development, run `npm run dev` in `web/` instead of building; it proxies `/api` 
 
 ```bash
 uv sync
-uv run pytest
-uv run ruff check src/ --fix
+uv run pytest                      # ~3 min; every LLM call is scripted, no API key needed
+uv run pytest --cov                # with coverage (fails below 60%)
+uv run ruff check src/ tests/ --fix
+cd web && npm run lint && npm run test && npm run build
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push: a Python job (ruff and
+pytest with coverage) and a web job (lint, test, build), with no secrets.
 
 ## Known limitations
 
