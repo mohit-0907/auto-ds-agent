@@ -191,6 +191,19 @@ def test_unsupported_file_type_is_rejected(client: TestClient, tmp_path: Path) -
     assert not (tmp_path / "runs").exists()
 
 
+def test_a_run_without_an_api_key_is_refused_before_anything_is_saved(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient, tmp_path: Path
+) -> None:
+    # e.g. `docker run` without --env-file: the page works, a run could only fail.
+    monkeypatch.setattr("autods.llm.missing_api_keys", lambda: ["OPENAI_API_KEY"])
+    response = _upload(client)
+
+    assert response.status_code == 503
+    assert response.json()["detail"].startswith("OPENAI_API_KEY is not set")
+    assert not (tmp_path / "runs").exists()
+    assert client.get("/api/health").json() == {"status": "ok"}  # the server stays up
+
+
 def test_blank_description_is_rejected(client: TestClient) -> None:
     response = _upload(client, description="   ")
     assert response.status_code == 400

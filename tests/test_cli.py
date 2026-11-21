@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from autods.arena.candidates import candidates
-from autods.cli import EXIT_NO_MODEL, app
+from autods.cli import EXIT_NO_MODEL, EXIT_USAGE, app
 from autods.config import PROJECT_ROOT
 from autods.state import FECode, ReportNarrative, TaskDecision
 from tests.helpers import install_scripted_llm, ok_result
@@ -160,3 +160,17 @@ def test_help_lists_the_options() -> None:
     text = ANSI.sub("", result.output)  # the same words, coloured (CI) or not (local)
     for option in ["--description", "--target", "--runs-dir", "--verbose"]:
         assert option in text
+
+
+def test_missing_api_key_stops_before_the_run_starts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("autods.llm.missing_api_keys", lambda: ["OPENAI_API_KEY"])
+    calls = install_scripted_llm(monkeypatch, {TaskDecision: [ok_result(DECISION)]})
+
+    result = _invoke(tmp_path)
+
+    assert result.exit_code == EXIT_USAGE
+    assert "OPENAI_API_KEY is not set" in result.output
+    assert calls[TaskDecision] == 0  # no LLM call was attempted
+    assert list(tmp_path.iterdir()) == []  # and no run folder was created

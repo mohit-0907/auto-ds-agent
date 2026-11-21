@@ -8,6 +8,8 @@ one fails with an install hint instead of an ImportError at module import time.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterable
 from functools import cache
 from string import Template
 from typing import TYPE_CHECKING, Generic, TypeVar
@@ -16,10 +18,13 @@ import structlog
 from pydantic import BaseModel
 
 from autods.config import (
+    FE_CODEGEN_MODEL,
     LLM_MAX_RETRIES,
     LLM_MAX_TOKENS,
     LLM_TIMEOUT_S,
     PROMPTS_DIR,
+    REPORTER_MODEL,
+    ROUTER_MODEL,
     estimate_cost_usd,
 )
 
@@ -27,6 +32,8 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
 
 SUPPORTED_PROVIDERS = ("openai", "anthropic")
+# The environment variable each provider's SDK reads its key from.
+PROVIDER_KEY_ENV = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
 
 log = structlog.get_logger(__name__)
 
@@ -98,6 +105,40 @@ def parse_model(model: str) -> tuple[str, str]:
             f"unsupported provider {provider!r}; expected one of {SUPPORTED_PROVIDERS}"
         )
     return provider, model_id
+
+
+def missing_api_keys(
+    models: Iterable[str] = (ROUTER_MODEL, FE_CODEGEN_MODEL, REPORTER_MODEL),
+) -> list[str]:
+    """Names of the API-key variables the configured models need but that are not set.
+
+    Checked before a run starts (CLI and web), so a missing key is reported at once
+    instead of failing the run after profiling. Without this, OpenAI's client fails
+    when it is built (a crashed run) while Anthropic's fails when called (a degraded
+    run): the same setup mistake would behave differently per provider. A blank value,
+    as in a freshly copied .env.example, counts as missing.
+
+    Callers look this up through the module (`llm.missing_api_keys()`), so tests can
+    replace it in one place (tests/conftest.py).
+
+    Args:
+        models: "<provider>:<model-id>" strings; by default the three LLM nodes' models.
+
+    Returns:
+        Sorted, de-duplicated variable names, e.g. ["OPENAI_API_KEY"]; empty when all set.
+    """
+    needed = {PROVIDER_KEY_ENV[parse_model(model)[0]] for model in models}
+    return sorted(name for name in needed if not os.getenv(name, "").strip())
+
+
+def missing_key_message(names: list[str]) -> str:
+    """One sentence telling the user which key to set and how, for the CLI and the API."""
+    keys = " and ".join(names)
+    verb = "is" if len(names) == 1 else "are"
+    return (
+        f"{keys} {verb} not set, so the agent cannot call its LLM. Set it in .env and "
+        "start again (with Docker: docker run --env-file .env ...)."
+    )
 
 
 def get_llm(model: str) -> BaseChatModel:

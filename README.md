@@ -87,7 +87,8 @@ with the generated [`fe_code.py`](docs/example_run/fe_code.py) and
 Each run gets its own folder under `runs/` with `report.md`, `leaderboard.csv`,
 `best_pipeline.joblib`, `fe_code.py` and `run.json`. `--target` names the column to predict
 (otherwise it is inferred); `--verbose` shows detailed logs. Exit codes: `0` a model was
-recommended, `2` bad command line, `3` the run ended without a model (the report says why).
+recommended, `2` bad command line or the API key is not set, `3` the run ended without a
+model (the report says why).
 
 ## Web app
 
@@ -115,6 +116,33 @@ One run at a time: a second upload while a run is in progress is refused. For fr
 development, run `npm run dev` in `web/` instead of building; it proxies `/api` to
 `autods serve` on port 8000.
 
+## Docker
+
+Only Docker is needed: no Python, uv or Node.js on the host.
+
+```bash
+docker build -t autods .
+docker run --rm -p 127.0.0.1:8000:8000 --env-file .env -v autods-runs:/app/runs autods
+# then open http://127.0.0.1:8000
+```
+
+- **`--env-file .env`** passes the API key when the container starts; the image never
+  contains it (`.dockerignore` keeps `.env` out of the build). Docker reads the file
+  literally, so write `OPENAI_API_KEY=sk-...` without quotes. Or pass it from the shell:
+  `-e OPENAI_API_KEY`. Forget it, and the app still opens but refuses to start a run,
+  saying which key is missing.
+- **`-p 127.0.0.1:8000:8000`** publishes the app on this machine only. The app has no
+  login, and plain `-p 8000:8000` would let anyone on the network start runs on your key.
+  The container's log says `http://0.0.0.0:8000`: that is the address inside the
+  container, not one to open.
+- **`-v autods-runs:/app/runs`** keeps the run history in a named volume, so it survives
+  the container being removed. Without it, every run is lost with the container.
+
+The image (about 1.3 GB, mostly scikit-learn, XGBoost, LightGBM and pandas) is built in
+two stages: Node builds the frontend, and only the built files are copied into a slim
+Python image, which runs as an ordinary user that can write to `runs/` and nowhere else.
+CI builds it and checks that it starts on every push.
+
 ## Development
 
 ```bash
@@ -132,8 +160,12 @@ pytest with coverage) and a web job (lint, test, build), with no secrets.
 
 - **The sandbox is isolation, not security.** Generated code runs in a separate process with
   a timeout, a stripped environment (no API keys), an import allowlist and, on Linux/macOS, a
-  memory cap. It still shares the filesystem and network with the host; real security needs a
-  container. The import check stops accidental harm, not a determined adversary.
+  memory cap. Run directly, it shares the filesystem and network with the host. The Docker
+  image keeps generated code away from the host's files, but inside the container the code
+  still runs as the same user as the web server, whose environment holds the API key: the
+  stripped environment stops accidents, not code written to go looking for the key (a
+  separate sandbox user would). The import check likewise stops accidental harm, not a
+  determined adversary.
 - **Generated feature code is batch-stateless.** It computes medians and categories from
   whatever frame it receives, so `best_pipeline.joblib` is for re-scoring batches (run
   `fe_code.py`, then align to the saved `feature_columns`), not single-row serving.

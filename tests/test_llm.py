@@ -16,7 +16,15 @@ from autods.config import (
     ROUTER_MODEL,
     estimate_cost_usd,
 )
-from autods.llm import get_llm, parse_model
+from autods.llm import (
+    PROVIDER_KEY_ENV,
+    get_llm,
+    missing_api_keys,
+    missing_key_message,
+    parse_model,
+)
+
+CONFIGURED_MODELS = (ROUTER_MODEL, FE_CODEGEN_MODEL, REPORTER_MODEL)
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +83,43 @@ def test_estimate_cost_usd() -> None:
 
 def test_unpriced_model_costs_zero() -> None:
     assert estimate_cost_usd("openai:not-in-the-table", 1000, 1000) == 0.0
+
+
+# --- The API-key check before a run (the real function: imported above, before the
+# --- autouse stub in conftest.py replaced the module attribute) ------------------------
+
+
+def test_no_missing_keys_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    assert missing_api_keys(["openai:gpt-6-luna", "openai:gpt-6.1-sol"]) == []
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_unset_or_blank_key_is_missing(monkeypatch: pytest.MonkeyPatch, value: str | None) -> None:
+    # Blank is what a freshly copied .env.example gives: "OPENAI_API_KEY=".
+    if value is None:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("OPENAI_API_KEY", value)
+    assert missing_api_keys(["openai:gpt-6-luna"]) == ["OPENAI_API_KEY"]
+
+
+def test_each_provider_needs_its_own_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    models = ["openai:gpt-6-luna", "anthropic:claude-opus-5-5", "anthropic:claude-sonnet-5-5"]
+    assert missing_api_keys(models) == ["ANTHROPIC_API_KEY"]  # once, though two models
+
+
+def test_default_checks_the_three_configured_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in PROVIDER_KEY_ENV.values():
+        monkeypatch.delenv(name, raising=False)
+    needed = {PROVIDER_KEY_ENV[parse_model(m)[0]] for m in CONFIGURED_MODELS}
+    assert missing_api_keys() == sorted(needed)
+
+
+def test_missing_key_message_names_the_key_and_the_fix() -> None:
+    one = missing_key_message(["OPENAI_API_KEY"])
+    assert one.startswith("OPENAI_API_KEY is not set") and "--env-file .env" in one
+    two = missing_key_message(["ANTHROPIC_API_KEY", "OPENAI_API_KEY"])
+    assert two.startswith("ANTHROPIC_API_KEY and OPENAI_API_KEY are not set")

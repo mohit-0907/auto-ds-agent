@@ -1,0 +1,32 @@
+# What `docker build` may NOT see. The Dockerfile copies only named paths, but the whole
+# build context is sent to Docker first, and one careless `COPY . .` would bake it all in.
+
+# Secrets: the API key is passed at run time, never built into the image.
+.env
+.env.*
+
+# Local state: past runs (and the models they saved) belong to this machine.
+runs/
+*.joblib
+*.pkl
+
+# Installed packages and build output: the image installs and builds its own.
+.venv/
+web/node_modules/
+web/dist/
+
+# Not needed to run the app.
+.git/
+.github/
+docs/
+scripts/
+tests/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
