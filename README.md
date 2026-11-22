@@ -8,11 +8,27 @@ best pipeline with a written justification.
 statistic, and training run is deterministic. The LLM is confined to three nodes —
 task routing, feature-engineering codegen, and the final report.
 
-Status: **Phase 8 of 8 (hardening)** — a CLI and a web app (FastAPI + React, live progress
-over Server-Sent Events) take a CSV to a number-verified report, a leaderboard and a saved
-model. CI runs both test suites on every push.
+Status: **complete (v1)**: a CLI and a web app (FastAPI + React, live progress over
+Server-Sent Events) take a CSV to a number-verified report, a leaderboard and a saved
+model; a Docker image runs it all. CI runs the test suites and builds the image on every
+push. `PROJECT_PLAN.md` has the full phase breakdown.
 
-See `PROJECT_PLAN.md` for the full architecture and phase breakdown.
+<!-- Demo GIF: docs/demo.gif, recorded with scripts/demo_serve.py (see "Web app"). -->
+
+## Quick start
+
+With Docker only (nothing else to install):
+
+```bash
+git clone <this repository> && cd auto-ds-agent
+cp .env.example .env                  # then set OPENAI_API_KEY=sk-... (no quotes)
+docker build -t autods .
+docker run --rm -p 127.0.0.1:8000:8000 --env-file .env -v autods-runs:/app/runs autods
+```
+
+Open http://127.0.0.1:8000, pick a sample dataset, say what to predict, and watch the run.
+A run takes about a minute and costs about $0.02 in LLM calls. Without Docker, see
+[Web app](#web-app) (uv and Node.js) or [Usage](#usage) (command line only).
 
 ## Architecture
 
@@ -37,10 +53,40 @@ Dashed arrows are decisions made in code by reading the shared state:
 The diagram is generated from the code (`uv run python scripts/render_graph.py`); a test
 fails if `docs/graph.mmd` no longer matches the graph.
 
+## Why the LLM only judges
+
+An LLM is good at reading a description and a data profile and making a call: *which*
+column is the target, *what* features make sense for this table, *how* to explain a
+result. It is bad at being the source of a number: it produces plausible figures that
+nobody can check, and different ones on every run. So the work is split:
+
+| The LLM decides (3 nodes) | Python computes and checks |
+|---|---|
+| **Router:** the task type and target column | **Sanity check:** the target's real statistics can overrule it (e.g. "binary" on 600 distinct floats becomes regression) |
+| **Feature codegen:** pandas code for this dataset | **Sandbox + validator:** the code runs in a subprocess and is accepted only if the row count, target, column types and leakage checks pass |
+| **Reporter:** five prose sections | **Facts sheet + number check:** every metric, lift and table is computed in Python; every number in the prose must match a fact (rounding allowed), or the reporter gets one retry naming the wrong numbers, then the report carries a visible warning |
+
+Every LLM answer arrives as a typed Pydantic object (structured output), never parsed out
+of free text. What this buys, measured:
+
+- **Reproducible results.** Given the same features, the leaderboard is identical on
+  every run, on Windows and in the Linux container alike (Titanic: HistGradientBoosting,
+  ROC-AUC 0.884, both).
+- **No invented numbers.** A metric in the report either matches the arena's own
+  calculation or is flagged.
+- **Cheap and bounded.** Usually three calls per run; more only when a feature attempt
+  fails (at most 3 attempts, enforced by the graph) or the report's number check asks for
+  its one retry. $0.023 per full run on average.
+- **It degrades instead of failing.** If the feature-code LLM fails, a fixed pandas recipe
+  makes the features; if the reporter fails, the report keeps its tables with a note; if
+  the router fails, the run ends with a report saying why. None of these crash the run.
+
 ## Evaluation
 
 Live runs against the real LLMs (`uv run pytest tests/eval_<name>.py -s`; not part of the
-test suite or CI, since they cost money and need the network).
+test suite or CI, since they cost money and need the network). The rows come from three
+separate evals, named in the "How" column: the router and feature evals stop before any
+model is trained, and the model rows come from the full-pipeline arena eval.
 
 | What | How | Target | Result |
 |---|---|---|---|
@@ -116,6 +162,13 @@ One run at a time: a second upload while a run is in progress is refused. For fr
 development, run `npm run dev` in `web/` instead of building; it proxies `/api` to
 `autods serve` on port 8000.
 
+**Demo mode.** Generated feature code usually passes on the first attempt, so an ordinary
+run rarely shows the repair loop. `uv run python scripts/demo_serve.py` starts the same app
+but breaks attempt 1 of every run on purpose: it appends a wrapper that drops one row, the
+sandbox rejects the result ("Row count changed"), and the LLM reads that error and writes
+attempt 2 itself. The injected code is visible in attempt 1's step, so a recording made
+this way shows openly that the first failure was staged.
+
 ## Docker
 
 Only Docker is needed: no Python, uv or Node.js on the host.
@@ -153,8 +206,9 @@ uv run ruff check src/ tests/ --fix
 cd web && npm run lint && npm run test && npm run build
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same checks on every push: a Python job (ruff and
-pytest with coverage) and a web job (lint, test, build), with no secrets.
+CI (`.github/workflows/ci.yml`) runs the same checks on every push, with no secrets: a
+Python job (ruff and pytest with coverage), a web job (lint, test, build), and a Docker
+job that builds the image and checks that it starts and serves the app.
 
 ## Known limitations
 
@@ -173,6 +227,22 @@ pytest with coverage) and a web job (lint, test, build), with no secrets.
   loading one executes code.
 - **Feature code can differ between runs.** Current LLMs do not accept temperature 0. Given
   the same features, the model arena's results are identical on every run.
+- **Cross-validation assumes independent rows.** The arena uses random (stratified)
+  K-fold. On grouped or time-ordered data, such as countries measured year after year, a
+  model is scored on years between ones it trained on, so the score is optimistic for
+  forecasting (see `healthexp` under Evaluation). Grouped or time-ordered folds would fix
+  this; the agent does not detect such data.
+- **The selection rule tests only the top model.** The best mean must beat every simpler
+  model on at least 4 of 5 folds, or the simpler one wins. Models ranked below the top are
+  never tested against the winner, so a lower-ranked model can sometimes clearly beat the
+  chosen one; the Results tab marks such comparisons "untested".
+- **The agent sees a profile, not how the data was collected.** In the NYC taxi data, cash
+  tips are recorded as $0, so "predict the tip" partly learns the payment method. Nothing
+  in the column statistics says so, and the agent cannot know it.
+- **Single user, local use.** One run at a time, no login. Keep it on your own machine
+  (the Docker command publishes it on 127.0.0.1 only).
+- **The narrow-screen drawer does not move keyboard focus** into the run list when it
+  opens.
 
 ## Out of scope (v1)
 

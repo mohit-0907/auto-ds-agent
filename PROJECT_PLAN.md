@@ -364,7 +364,9 @@ Time-series support · SHAP explanations in the report · Optuna HPO · cloud de
 
 ## 10. CV framing
 
-> **Autonomous Data Science Agent** — LangGraph agent that profiles a tabular dataset, infers the ML task type, generates and self-repairs feature engineering code in a sandboxed executor (3-attempt corrective loop with graceful fallback), benchmarks 6 model families under cross-validation, and produces a justified, number-verified recommendation — via a CLI and a React + FastAPI web app that streams the agent's progress live over Server-Sent Events. Architected so the LLM handles judgment while all metrics and training remain deterministic. Router accuracy 9/10 on a held-out eval set; 92% FE success within 3 attempts.
+> **Autonomous Data Science Agent** — LangGraph agent that profiles a tabular dataset, infers the ML task type, generates and self-repairs feature engineering code in a sandboxed executor (3-attempt corrective loop with graceful fallback), benchmarks 6 model families under cross-validation, and produces a justified, number-verified recommendation — via a CLI and a React + FastAPI web app that streams the agent's progress live over Server-Sent Events. Architected so the LLM handles judgment while all metrics and training remain deterministic. Router 10/10 on a labelled eval set (stable over 3 repeats); generated feature code passed on the first attempt for 10/10 datasets; chosen model beat the baseline 5/5; ~$0.02 of LLM calls per run. Dockerized; 400+ tests and a 3-job CI pipeline.
+
+*(Numbers from the README's Evaluation section, updated 2026-11-21 from the planning placeholders "9/10" and "92%". In an interview, say why 10/10 FE is a ceiling, not a rate: easy public datasets, single pass; the repair loop's evidence is the injected-fault eval.)*
 
 Interview questions this project earns you, and which you must be able to answer:
 1. Why keep the LLM out of the training loop?
