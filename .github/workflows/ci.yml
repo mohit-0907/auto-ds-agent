@@ -1,5 +1,6 @@
 # CI: the same checks as CLAUDE.md asks for before every task, on every push.
-# Two independent jobs, so a frontend failure never hides a Python one (or the reverse).
+# Independent jobs, so a frontend failure never hides a Python one (or the reverse), plus
+# a third that builds and starts the Docker image.
 # No secrets: every LLM call in the tests is scripted, so no API key and no network to OpenAI.
 
 name: CI
@@ -52,3 +53,25 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+
+  docker:
+    name: Docker · build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      # Build only: nothing is pushed anywhere, and no key is involved.
+      - run: docker build --tag autods:ci .
+      # A Dockerfile can build and still not run (a missing system library only shows up
+      # on import), so start it and ask for the page, the API and a font file.
+      - name: Smoke test
+        run: |
+          docker run --rm autods:ci python -c "import lightgbm, xgboost, autods.graph"
+          docker run --detach --name autods -p 127.0.0.1:8000:8000 autods:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/api/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:8000/ | grep -q '<div id="root">'
+          curl -fs http://127.0.0.1:8000/runs/some-run | grep -q '<div id="root">'
+          curl -fs http://127.0.0.1:8000/api/samples | grep -q Titanic
+      - name: Container logs
+        if: failure()
+        run: docker logs autods || true

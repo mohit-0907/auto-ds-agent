@@ -7,7 +7,8 @@ allowed to print() (CLAUDE.md).
 Exit codes, so scripts and CI can tell outcomes apart:
     0  a model was recommended
     1  unexpected crash (Python's default for an uncaught exception)
-    2  bad command line (typer/click's convention, e.g. the file does not exist)
+    2  bad command line (typer/click's convention, e.g. the file does not exist), or
+       the API key the configured models need is not set
     3  the run finished but ended without a model; report.md explains why
 """
 
@@ -20,10 +21,12 @@ from typing import Annotated
 import structlog
 import typer
 
+from autods import llm
 from autods.config import RUNS_DIR, WEB_DIST_DIR
 from autods.graph import initial_state, new_run_dir
 from autods.progress import GraphRun
 
+EXIT_USAGE = 2  # the same code typer uses for a bad command line
 EXIT_NO_MODEL = 3
 
 app = typer.Typer(
@@ -65,6 +68,10 @@ def run(
 ) -> None:
     """Profile a dataset, pick the task, engineer features, benchmark models, write a report."""
     _configure_logging(verbose)
+    missing = llm.missing_api_keys()
+    if missing:  # before the run folder exists: a run that can only fail leaves nothing
+        typer.echo(llm.missing_key_message(missing), err=True)
+        raise typer.Exit(code=EXIT_USAGE)
     run_dir = new_run_dir(dataset, runs_dir)
     typer.echo(f"Run folder: {run_dir}\n")
 
@@ -104,6 +111,9 @@ def serve(
             f"autods API on {url}/docs  ·  the web app is not built yet: "
             "run `cd web && npm install && npm run build`, then restart."
         )
+    missing = llm.missing_api_keys()
+    if missing:  # the pages still work (past runs, downloads); new runs are refused
+        typer.echo(f"Warning: {llm.missing_key_message(missing)}", err=True)
     uvicorn.run(
         create_app(runs_dir), host=host, port=port, log_level="info" if verbose else "warning"
     )

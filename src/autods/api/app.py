@@ -27,6 +27,7 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
+from autods import llm
 from autods.api.runs import (
     DOWNLOADABLE,
     RunConflictError,
@@ -185,6 +186,11 @@ def create_app(
         target: Annotated[str | None, Form(description="Target column; inferred if empty.")] = None,
     ) -> RunCreated:
         """Save the upload (or copy the sample) into a new run folder and start the agent."""
+        missing = llm.missing_api_keys()
+        if missing:
+            # 503: the request is fine, the server is not set up to serve it. Checked
+            # first, so nothing is saved for a run that could only fail.
+            raise HTTPException(503, llm.missing_key_message(missing))
         if not description.strip():
             raise HTTPException(400, "Describe what you want to predict.")
         if (file is None) == (sample is None):
